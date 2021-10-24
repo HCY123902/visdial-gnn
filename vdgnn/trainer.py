@@ -91,10 +91,10 @@ class Trainer(object):
                 dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
 
                 # Added temporarily
-                batch['ans_ind'] = torch.tensor([[1] * 10] * 32).cuda()
-                print("ans_ind size: {}".format(batch["ans_ind"].size()))
+                ans_ind = torch.tensor([[1] * 10] * 32).cuda()
+                print("ans_ind size: {}".format(ans_ind.size()))
 
-                cur_loss = criterion(dec_out, batch['ans_ind'].view(-1))
+                cur_loss = criterion(dec_out, ans_ind.view(-1))
                 cur_loss.backward()
 
                 optimizer.step()

@@ -63,7 +63,8 @@ class DiscriminativeDecoder(nn.Module):
         scores = enc_out[:, :100]
 
         # return scores
-        scores = torch.stack(scores, 1)
+        # scores = torch.stack(scores, 1)
+        
         print("scores size: {}; enc_out size: {}".format(scores.size(), enc_out.size()))
         # print(scores.size())
         log_probs = self.log_softmax(scores)

@@ -73,6 +73,11 @@ class GCNNEncoder(nn.Module):
 
         # encode q_rnd
         q_emb = self.word_embed(ques)
+        
+        # print(ques)
+        # print(ques_len)
+        # print(q_emb)
+        
         q_emb = self.node_rnn(q_emb, ques_len, initial_state=None)
         # q_attn, img_attn = self.node_coattn(q_emb, img_feat)
         # q_node = torch.cat((img_attn, q_attn), dim=1)

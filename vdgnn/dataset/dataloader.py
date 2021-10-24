@@ -153,9 +153,9 @@ class VisDialDataset(Dataset):
         # load all data mats from ques_file into this
         self.data = {}
 
-        self.img_norm = args.img_norm
-        img_fnames = getattr(self, 'unique_img_' + data_split)
-        self.data[self.__split + '_img_fnames'] = img_fnames[self.data_start_idx:self.data_end_idx]
+        # self.img_norm = args.img_norm
+        # img_fnames = getattr(self, 'unique_img_' + data_split)
+        # self.data[self.__split + '_img_fnames'] = img_fnames[self.data_start_idx:self.data_end_idx]
 
         # map from load to save labels
         io_map = {
@@ -172,6 +172,8 @@ class VisDialDataset(Dataset):
             'num_rounds_{}': '{}_num_rounds',
             # 'ans_index_{}': '{}_ans_ind'
         }
+        
+        # print("----------------------------length {}------------------------------".format(ques_file["ques_length_train"][397]))
 
         # read the question, answer, option related information
         for load_label, save_label in iteritems(io_map):
@@ -243,6 +245,10 @@ class VisDialDataset(Dataset):
         # get question tokens
         item['ques'] = self.data[dtype + '_ques'][idx]
         item['ques_len'] = self.data[dtype + '_ques_len'][idx]
+        
+        # for n, i in enumerate(item['ques_len']):
+        #     if i == 0:
+        #         print("{} {}".format(idx, n))
 
         # get history tokens
         item['hist_len'] = self.data[dtype + '_hist_len'][idx]
@@ -282,10 +288,12 @@ class VisDialDataset(Dataset):
 
         # convert zero length sequences to one length
         # this is for handling empty rounds of v1.0 test, they will be dropped anyway
-        if dtype == 'test':
-            item['ques_len'][item['ques_len'] == 0] += 1
-            # item['opt_len'][item['opt_len'] == 0] += 1
-            item['hist_len'][item['hist_len'] == 0] += 1
+        
+        # Adjusted
+        # if dtype == 'test':
+        item['ques_len'][item['ques_len'] == 0] += 1
+        # item['opt_len'][item['opt_len'] == 0] += 1
+        item['hist_len'][item['hist_len'] == 0] += 1
         return item
 
     # -------------------------------------------------------------------------
@@ -318,8 +326,8 @@ class VisDialDataset(Dataset):
         batch_keys = ['num_rounds', 'hist', 'hist_len', 'ques', 'ques_len',
                       'ans', 'ans_len']
 
-        if dtype != 'test':
-            batch_keys.append('ans_ind')
+        #if dtype != 'test':
+        #    batch_keys.append('ans_ind')
 
         if dtype == 'val' and self.annotations_reader is not None:
             batch_keys.append('gt_relevance')
@@ -362,8 +370,8 @@ class VisDialDataset(Dataset):
             for round_id in range(num_rounds):
                 if round_id == 0:
                     # first round has caption as history
-                    history[th_id][round_id][0:1] \
-                        = np.array([self.word2ind['<START>'], self.word2ind['<END>']])
+                    history[th_id][round_id][0:2] \
+                        = torch.tensor(np.array([self.word2ind['<START>'], self.word2ind['<END>']]))
                 else:
                     qlen = ques_len[th_id][round_id - 1]
                     alen = ans_len[th_id][round_id - 1]
