@@ -39,15 +39,15 @@ def tokenize_data(data, word_count=False):
     dialogs = data['data']['dialogs']
     # dialogs is a nested dict so won't be copied, just a reference
 
-    print("[%s] Tokenizing captions..." % data['split'])
-    for i, dialog in enumerate(tqdm(dialogs)):
-        caption = word_tokenize(dialog['caption'])
-        dialogs[i]['caption_tokens'] = caption
+    # print("[%s] Tokenizing captions..." % data['split'])
+    # for i, dialog in enumerate(tqdm(dialogs)):
+    #     caption = word_tokenize(dialog['caption'])
+    #     dialogs[i]['caption_tokens'] = caption
 
     print("[%s] Tokenizing questions and answers..." % data['split'])
     q_tokens, a_tokens = [], []
     for q in tqdm(data['data']['questions']):
-        q_tokens.append(word_tokenize(q + '?'))
+        q_tokens.append(word_tokenize(q))
 
     for a in tqdm(data['data']['answers']):
         a_tokens.append(word_tokenize(a))
@@ -68,12 +68,14 @@ def tokenize_data(data, word_count=False):
     if word_count:
         print("[%s] Building word counts from tokens..." % data['split'])
         for i, dialog in enumerate(tqdm(dialogs)):
-            caption = dialogs[i]['caption_tokens']
+            # caption = dialogs[i]['caption_tokens']
             all_qa = []
             for j in range(10):
                 all_qa += q_tokens[dialog['dialog'][j]['question']]
+                # print(len(a_tokens))
+                # print(dialog['dialog'][j]['answer'])
                 all_qa += a_tokens[dialog['dialog'][j]['answer']]
-            for word in caption + all_qa:
+            for word in all_qa:
                 word_counts[word] = word_counts.get(word, 0) + 1
     print('\n')
     return data, word_counts
@@ -82,10 +84,10 @@ def tokenize_data(data, word_count=False):
 def encode_vocab(data, word2ind):
     """Converts string tokens to indices based on given dictionary."""
     dialogs = data['data']['dialogs']
-    print("[%s] Encoding caption tokens..." % data['split'])
-    for i, dialog in enumerate(tqdm(dialogs)):
-        dialogs[i]['caption_tokens'] = [word2ind.get(word, word2ind['UNK']) \
-                                        for word in dialog['caption_tokens']]
+    # print("[%s] Encoding caption tokens..." % data['split'])
+    # for i, dialog in enumerate(tqdm(dialogs)):
+    #     dialogs[i]['caption_tokens'] = [word2ind.get(word, word2ind['UNK']) \
+    #                                     for word in dialog['caption_tokens']]
 
     print("[%s] Encoding question and answer tokens..." % data['split'])
     q_tokens = data['data']['question_tokens']
@@ -105,18 +107,18 @@ def encode_vocab(data, word2ind):
 def create_data_mats(data, params, dtype):
     num_threads = len(data['data']['dialogs'])
     data_mats = {}
-    data_mats['img_pos'] = np.arange(num_threads, dtype=np.int)
+    # data_mats['img_pos'] = np.arange(num_threads, dtype=np.int)
 
-    print("[%s] Creating caption data matrices..." % data['split'])
-    max_cap_len = params.max_cap_len
-    captions = np.zeros([num_threads, max_cap_len])
-    caption_len = np.zeros(num_threads, dtype=np.int)
+    # print("[%s] Creating caption data matrices..." % data['split'])
+    # max_cap_len = params.max_cap_len
+    # captions = np.zeros([num_threads, max_cap_len])
+    # caption_len = np.zeros(num_threads, dtype=np.int)
 
-    for i, dialog in enumerate(tqdm(data['data']['dialogs'])):
-        caption_len[i] = len(dialog['caption_tokens'][0:max_cap_len])
-        captions[i][0:caption_len[i]] = dialog['caption_tokens'][0:max_cap_len]
-    data_mats['cap_length'] = caption_len
-    data_mats['cap'] = captions
+    # for i, dialog in enumerate(tqdm(data['data']['dialogs'])):
+    #     caption_len[i] = len(dialog['caption_tokens'][0:max_cap_len])
+    #     captions[i][0:caption_len[i]] = dialog['caption_tokens'][0:max_cap_len]
+    # data_mats['cap_length'] = caption_len
+    # data_mats['cap'] = captions
 
     print("[%s] Creating question and answer data matrices..." % data['split'])
     num_rounds = 10
@@ -146,46 +148,48 @@ def create_data_mats(data, params, dtype):
     data_mats['ques_length'] = ques_length
     data_mats['ans_length'] = ans_length
 
-    print("[%s] Creating options data matrices..." % data['split'])
-    # options and answer_index are 1-indexed specifically for lua
-    options = np.ones([num_threads, num_rounds, 100])
+    # print("[%s] Creating options data matrices..." % data['split'])
+    # # options and answer_index are 1-indexed specifically for lua
+    # options = np.ones([num_threads, num_rounds, 100])
+
     num_rounds_list = np.full(num_threads, 10)
 
     for i, dialog in enumerate(tqdm(data['data']['dialogs'])):
         for j in range(num_rounds):
             num_rounds_list[i] = dialog['num_rounds']
             # v1.0 test does not have options for all dialog rounds
-            if 'answer_options' in dialog['dialog'][j]:
-                options[i][j] += np.array(dialog['dialog'][j]['answer_options'])
+            # if 'answer_options' in dialog['dialog'][j]:
+            #    options[i][j] += np.array(dialog['dialog'][j]['answer_options'])
 
     data_mats['num_rounds'] = num_rounds_list
-    data_mats['opt'] = options
+    # data_mats['opt'] = options
 
-    if dtype != 'test':
-        print("[%s] Creating ground truth answer data matrices..." % data['split'])
-        answer_index = np.zeros([num_threads, num_rounds])
-        for i, dialog in enumerate(tqdm(data['data']['dialogs'])):
-            for j in range(num_rounds):
-                answer_index[i][j] = dialog['dialog'][j]['gt_index'] + 1
-        data_mats['ans_index'] = answer_index
+    # if dtype != 'test':
+    #     print("[%s] Creating ground truth answer data matrices..." % data['split'])
+    #     answer_index = np.zeros([num_threads, num_rounds])
+    #     for i, dialog in enumerate(tqdm(data['data']['dialogs'])):
+    #         for j in range(num_rounds):
+    #             answer_index[i][j] = dialog['dialog'][j]['gt_index'] + 1
+    #     data_mats['ans_index'] = answer_index
 
-    options_len = np.zeros(len(data['data']['answer_tokens']), dtype=np.int)
-    options_list = np.zeros([len(data['data']['answer_tokens']), max_ans_len])
+    # options_len = np.zeros(len(data['data']['answer_tokens']), dtype=np.int)
+    # options_list = np.zeros([len(data['data']['answer_tokens']), max_ans_len])
 
-    for i, ans_token in enumerate(tqdm(data['data']['answer_tokens'])):
-        options_len[i] = len(ans_token[0:max_ans_len])
-        options_list[i][0:options_len[i]] = ans_token[0:max_ans_len]
+    # for i, ans_token in enumerate(tqdm(data['data']['answer_tokens'])):
+    #     options_len[i] = len(ans_token[0:max_ans_len])
+    #     options_list[i][0:options_len[i]] = ans_token[0:max_ans_len]
 
-    data_mats['opt_length'] = options_len
-    data_mats['opt_list'] = options_list
+    # data_mats['opt_length'] = options_len
+    # data_mats['opt_list'] = 
+    
     return data_mats
 
 
-def get_image_ids(data, id2path):
-    image_ids = [dialog['image_id'] for dialog in data['data']['dialogs']]
-    for i, image_id in enumerate(image_ids):
-        image_ids[i] = id2path[image_id]
-    return image_ids
+# def get_image_ids(data, id2path):
+#     image_ids = [dialog['image_id'] for dialog in data['data']['dialogs']]
+#     for i, image_id in enumerate(image_ids):
+#         image_ids[i] = id2path[image_id]
+#     return image_ids
 
 
 if __name__ == "__main__":
@@ -281,17 +285,17 @@ if __name__ == "__main__":
     out['ind2word'] = ind2word
     out['word2ind'] = word2ind
 
-    print('Preparing image paths with image_ids...')
-    id2path = {}
-    # NOTE: based on assumption that image_id is unique across all splits
-    for image_path in tqdm(glob.iglob(os.path.join(args.image_root, '*', '*.jpg'))):
-        id2path[int(image_path[-12:-4])] = '/'.join(image_path.split('/')[-2:])
+    # print('Preparing image paths with image_ids...')
+    # id2path = {}
+    # # NOTE: based on assumption that image_id is unique across all splits
+    # for image_path in tqdm(glob.iglob(os.path.join(args.image_root, '*', '*.jpg'))):
+    #     id2path[int(image_path[-12:-4])] = '/'.join(image_path.split('/')[-2:])
 
-    out['unique_img_train'] = get_image_ids(data_train, id2path)
-    out['unique_img_val'] = get_image_ids(data_val, id2path)
-    out['unique_img_test'] = get_image_ids(data_test, id2path)
-    if args.train_split == 'trainval':
-        out['unique_img_train'] += out['unique_img_val']
-        out.pop('unique_img_val')
+    # out['unique_img_train'] = get_image_ids(data_train, id2path)
+    # out['unique_img_val'] = get_image_ids(data_val, id2path)
+    # out['unique_img_test'] = get_image_ids(data_test, id2path)
+    # if args.train_split == 'trainval':
+    #     out['unique_img_train'] += out['unique_img_val']
+    #     out.pop('unique_img_val')
     print('Saving json to %s...' % args.output_json)
     json.dump(out, open(args.output_json, 'w'))

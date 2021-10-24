@@ -6,7 +6,7 @@ import vdgnn.units as units
 class GCNNEncoder(nn.Module):
     def __init__(self, model_args):
         super(GCNNEncoder, self).__init__()
-        self.img_feat_size = model_args.img_feat_size
+        # self.img_feat_size = model_args.img_feat_size
         self.embed_size = model_args.embed_size
         self.rnn_hidden_size = model_args.rnn_hidden_size
         self.num_layers = model_args.num_layers
@@ -21,10 +21,11 @@ class GCNNEncoder(nn.Module):
 
         self.node_rnn = units.DynamicRNN(nn.LSTM(self.embed_size, self.rnn_hidden_size, self.num_layers,
                             batch_first=True, dropout=self.dropout))
-        self.node_coattn = units.AlterCoAttn(num_hidden=512, img_feat_size=self.img_feat_size,
-                            ques_feat_size=self.rnn_hidden_size, dropout=self.dropout)
+        # self.node_coattn = units.AlterCoAttn(num_hidden=512, img_feat_size=self.img_feat_size,
+        #                     ques_feat_size=self.rnn_hidden_size, dropout=self.dropout)
 
-        funsion_size = self.img_feat_size + self.rnn_hidden_size
+        # funsion_size = self.img_feat_size + self.rnn_hidden_size
+        funsion_size = self.rnn_hidden_size
         self.fusion = nn.Linear(funsion_size, self.message_size)
 
         self.node_feat_size = self.message_size
@@ -33,8 +34,8 @@ class GCNNEncoder(nn.Module):
         self.update_fun = units.UpdateFunction('gru', self.message_size, self.node_feat_size, update_hidden_layers=1, update_bias=False, update_dropout=0)
 
     def get_node_feat_vec(self, batch):
-        img_feat = batch['img_feat']
-        img_feat = img_feat.view(img_feat.size(0), -1, self.img_feat_size)
+        # img_feat = batch['img_feat']
+        # img_feat = img_feat.view(img_feat.size(0), -1, self.img_feat_size)
 
         ques = batch['ques']
         ques_len = batch['ques_len']
@@ -61,19 +62,23 @@ class GCNNEncoder(nn.Module):
             h_l = hist_len[:, rnd]
 
             hist_emb = self.node_rnn(h_i, h_l, initial_state=None)
-            hist_attn, img_attn = self.node_coattn(hist_emb, img_feat)
+            # hist_attn, img_attn = self.node_coattn(hist_emb, img_feat)
 
-            fused_vec = torch.cat((img_attn, hist_attn), dim=1)
-            fused_emb = self.fusion(fused_vec)
+            # fused_vec = torch.cat((img_attn, hist_attn), dim=1)
+            # fused_emb = self.fusion(fused_vec)
+
+            fused_emb = self.fusion(hist_emb)
 
             node_vec[:, rnd, :] = fused_emb
 
         # encode q_rnd
         q_emb = self.word_embed(ques)
         q_emb = self.node_rnn(q_emb, ques_len, initial_state=None)
-        q_attn, img_attn = self.node_coattn(q_emb, img_feat)
-        q_node = torch.cat((img_attn, q_attn), dim=1)
-        q_node = self.fusion(q_node)
+        # q_attn, img_attn = self.node_coattn(q_emb, img_feat)
+        # q_node = torch.cat((img_attn, q_attn), dim=1)
+        # q_node = self.fusion(q_node)
+
+        q_node = self.fusion(q_emb)
 
         node_vec[:, round_id+1, :] = q_node
 

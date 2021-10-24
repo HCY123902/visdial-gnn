@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 from vdgnn.dataset.readers import DenseAnnotationsReader, ImageFeaturesHdfReader
 
-TRAIN_VAL_SPLIT = {'0.9': 80000, '1.0': 123287}
+TRAIN_VAL_SPLIT = {'0.9': 11118, '1.0': 11118}
 
 class VisDialDataset(Dataset):
     def __init__(self, args, split, isTrain=True):
@@ -46,14 +46,14 @@ class VisDialDataset(Dataset):
         self.__in_memory = args.in_memory
         self.__version = args.version
         self.isTrain = isTrain
-        if self.__split == 'val' and self.__version == '0.9' and self.isTrain:
-            input_img_path = args.img_train
-            img_split = 'train'
-            self.img_start_idx = TRAIN_VAL_SPLIT[self.__version]
-        else:
-            input_img_path = getattr(args, 'img_%s' % split)
-            img_split = self.__split
-            self.img_start_idx = 0
+        # if self.__split == 'val' and self.__version == '0.9' and self.isTrain:
+        #     # input_img_path = args.img_train
+        #     # img_split = 'train'
+        #     # self.img_start_idx = TRAIN_VAL_SPLIT[self.__version]
+        # else:
+        #     # input_img_path = getattr(args, 'img_%s' % split)
+        #     # img_split = self.__split
+        #     # self.img_start_idx = 0
         if self.__split == 'val' and self.isTrain:
             self.data_start_idx = TRAIN_VAL_SPLIT[self.__version]
             data_split = 'train'
@@ -61,15 +61,19 @@ class VisDialDataset(Dataset):
             self.data_start_idx = 0
             data_split = self.__split
 
-        self.input_img = os.path.join(args.dataroot, input_img_path)
+        #self.input_img = os.path.join(args.dataroot, input_img_path)
+
         self.input_json = os.path.join(args.dataroot, args.visdial_params)
         self.input_ques = os.path.join(args.dataroot, args.visdial_data)
+
         self.input_dialog = os.path.join(
             args.dataroot, getattr(args, 'dialog_%s' % split))
+
         self.dense_annotations_jsonpath = os.path.join(
             args.dataroot, args.dense_annotations)
+
         self.num_data = getattr(args, 'num_%s' % split)
-        self.use_img_id_idx = None
+        # self.use_img_id_idx = None
 
         # preprocessing split
         print("\nProcessing split [{}]...".format(self.__split))
@@ -98,34 +102,36 @@ class VisDialDataset(Dataset):
             for word, ind in iteritems(self.word2ind)
         }
 
-        print("Dataloader loading image h5 file: {}".format(self.input_img))
+        # print("Dataloader loading image h5 file: {}".format(self.input_img))
         # Either img_feats or img_reader will be set.
-        if self.__version == '0.9':
-            # trainval image features
-            with h5py.File(self.input_img, 'r') as img_hdf5:
-                img_feats_h5 = img_hdf5.get('images_%s' % img_split)
-                self.num_data_points = len(img_feats_h5) - self.img_start_idx
-                self.img_reader = None
-                if self.__split == 'train':
-                    self.num_data_points = min(self.num_data_points, TRAIN_VAL_SPLIT[self.__version])
-        else:
-            # split image features
-            self.use_img_id_idx = True
-            self.img_reader = ImageFeaturesHdfReader(
-                self.input_img, in_memory=self.__in_memory)
-            self.num_data_points = len(self.img_reader)
+        # if self.__version == '0.9':
+        #     # trainval image features
+        #     with h5py.File(self.input_img, 'r') as img_hdf5:
+        #         img_feats_h5 = img_hdf5.get('images_%s' % img_split)
+        #         self.num_data_points = len(img_feats_h5) - self.img_start_idx
+        #         self.img_reader = None
+        #         if self.__split == 'train':
+        #             self.num_data_points = min(self.num_data_points, TRAIN_VAL_SPLIT[self.__version])
+        # else:
+        #     # split image features
+        #     self.use_img_id_idx = True
+        #     self.img_reader = ImageFeaturesHdfReader(
+        #         self.input_img, in_memory=self.__in_memory)
+        #     self.num_data_points = len(self.img_reader)
+
+        self.num_data_points = 11118 if self.__split == 'train' else 1000
 
         if self.num_data is not None:
             self.num_data_points = min(self.num_data, self.num_data_points)
 
-        self.img_end_idx = self.img_start_idx + self.num_data_points
+        # self.img_end_idx = self.img_start_idx + self.num_data_points
         self.data_end_idx = self.data_start_idx + self.num_data_points
 
-        if self.img_reader is None:
-            with h5py.File(self.input_img, 'r') as img_hdf5:
-                img_feats_h5 = img_hdf5.get('images_%s' % img_split)
-                self.img_feats = torch.from_numpy(
-                    np.array(img_feats_h5[self.img_start_idx:self.img_end_idx]))
+        # if self.img_reader is None:
+        #     with h5py.File(self.input_img, 'r') as img_hdf5:
+        #         img_feats_h5 = img_hdf5.get('images_%s' % img_split)
+        #         self.img_feats = torch.from_numpy(
+        #             np.array(img_feats_h5[self.img_start_idx:self.img_end_idx]))
         
         if 'val' == self.__split and os.path.exists(self.dense_annotations_jsonpath):
             self.use_img_id_idx = True
@@ -134,12 +140,12 @@ class VisDialDataset(Dataset):
         else:
             self.annotations_reader = None
 
-        if self.use_img_id_idx:
-            print('Loading input dialog json: {}'.format(self.input_dialog))
-            with open(self.input_dialog, 'r') as dialog_json:
-                visdial_data = json.load(dialog_json)
-                self.idx2imgid = [dialog_for_image['image_id']
-                                  for dialog_for_image in visdial_data['data']['dialogs']]
+        # if self.use_img_id_idx:
+        #     print('Loading input dialog json: {}'.format(self.input_dialog))
+        #     with open(self.input_dialog, 'r') as dialog_json:
+        #         visdial_data = json.load(dialog_json)
+        #         self.idx2imgid = [dialog_for_image['image_id']
+        #                           for dialog_for_image in visdial_data['data']['dialogs']]
 
         print("Dataloader loading h5 file: {}".format(self.input_ques))
         ques_file = h5py.File(self.input_ques, 'r')
@@ -157,14 +163,14 @@ class VisDialDataset(Dataset):
             'ques_length_{}': '{}_ques_len',
             'ans_{}': '{}_ans',
             'ans_length_{}': '{}_ans_len',
-            'img_pos_{}': '{}_img_pos',
-            'cap_{}': '{}_cap',
-            'cap_length_{}': '{}_cap_len',
-            'opt_{}': '{}_opt',
-            'opt_length_{}': '{}_opt_len',
-            'opt_list_{}': '{}_opt_list',
+            # 'img_pos_{}': '{}_img_pos',
+            # 'cap_{}': '{}_cap',
+            # 'cap_length_{}': '{}_cap_len',
+            # 'opt_{}': '{}_opt',
+            # 'opt_length_{}': '{}_opt_len',
+            # 'opt_list_{}': '{}_opt_list',
             'num_rounds_{}': '{}_num_rounds',
-            'ans_index_{}': '{}_ans_ind'
+            # 'ans_index_{}': '{}_ans_ind'
         }
 
         # read the question, answer, option related information
@@ -201,9 +207,9 @@ class VisDialDataset(Dataset):
         # prepare history
         self._process_history(self.__split)
         # 1 indexed to 0 indexed
-        self.data[self.__split + '_opt'] -= 1
-        if self.__split + '_ans_ind' in self.data:
-            self.data[self.__split + '_ans_ind'] -= 1
+        # self.data[self.__split + '_opt'] -= 1
+        # if self.__split + '_ans_ind' in self.data:
+        #     self.data[self.__split + '_ans_ind'] -= 1
 
     @property
     def split(self):
@@ -222,17 +228,17 @@ class VisDialDataset(Dataset):
         item['num_rounds'] = self.data[dtype + '_num_rounds'][idx]
 
         # get image features
-        if self.use_img_id_idx:
-            image_id = self.idx2imgid[idx]
-            item['image_id'] = torch.tensor(image_id).long()
-        if self.img_reader is None:
-            img_feats = self.img_feats[idx]
-        else:
-            img_feats = torch.tensor(self.img_reader[image_id])
-        if self.img_norm:
-            img_feats = F.normalize(img_feats, dim=0, p=2)
-        item['img_feat'] = img_feats
-        item['img_fnames'] = self.data[dtype + '_img_fnames'][idx]
+        # if self.use_img_id_idx:
+        #     image_id = self.idx2imgid[idx]
+        #     item['image_id'] = torch.tensor(image_id).long()
+        # if self.img_reader is None:
+        #     img_feats = self.img_feats[idx]
+        # else:
+        #     img_feats = torch.tensor(self.img_reader[image_id])
+        # if self.img_norm:
+        #     img_feats = F.normalize(img_feats, dim=0, p=2)
+        # item['img_feat'] = img_feats
+        # item['img_fnames'] = self.data[dtype + '_img_fnames'][idx]
 
         # get question tokens
         item['ques'] = self.data[dtype + '_ques'][idx]
@@ -243,29 +249,29 @@ class VisDialDataset(Dataset):
         item['hist'] = self.data[dtype + '_hist'][idx]
 
         # get caption tokens
-        item['cap'] = self.data[dtype + '_cap'][idx]
-        item['cap_len'] = self.data[dtype + '_cap_len'][idx]
+        # item['cap'] = self.data[dtype + '_cap'][idx]
+        # item['cap_len'] = self.data[dtype + '_cap_len'][idx]
 
         # get answer tokens
         item['ans'] = self.data[dtype + '_ans'][idx]
         item['ans_len'] = self.data[dtype + '_ans_len'][idx]
 
         # get options tokens
-        opt_inds = self.data[dtype + '_opt'][idx]
-        opt_size = list(opt_inds.size())
-        new_size = torch.Size(opt_size + [-1])
-        ind_vector = opt_inds.view(-1)
-        option_in = self.data[dtype + '_opt_list'].index_select(0, ind_vector)
-        option_in = option_in.view(new_size)
+        # opt_inds = self.data[dtype + '_opt'][idx]
+        # opt_size = list(opt_inds.size())
+        # new_size = torch.Size(opt_size + [-1])
+        # ind_vector = opt_inds.view(-1)
+        # option_in = self.data[dtype + '_opt_list'].index_select(0, ind_vector)
+        # option_in = option_in.view(new_size)
 
-        opt_len = self.data[dtype + '_opt_len'].index_select(0, ind_vector)
-        opt_len = opt_len.view(opt_size)
+        # opt_len = self.data[dtype + '_opt_len'].index_select(0, ind_vector)
+        # opt_len = opt_len.view(opt_size)
 
-        item['opt'] = option_in
-        item['opt_len'] = opt_len
-        if dtype != 'test':
-            ans_ind = self.data[dtype + '_ans_ind'][idx]
-            item['ans_ind'] = ans_ind.view(-1)
+        # item['opt'] = option_in
+        # item['opt_len'] = opt_len
+        # if dtype != 'test':
+        #     ans_ind = self.data[dtype + '_ans_ind'][idx]
+        #     item['ans_ind'] = ans_ind.view(-1)
 
         if dtype == 'val' and self.annotations_reader is not None:
             dense_annotations = self.annotations_reader[image_id]
@@ -278,7 +284,7 @@ class VisDialDataset(Dataset):
         # this is for handling empty rounds of v1.0 test, they will be dropped anyway
         if dtype == 'test':
             item['ques_len'][item['ques_len'] == 0] += 1
-            item['opt_len'][item['opt_len'] == 0] += 1
+            # item['opt_len'][item['opt_len'] == 0] += 1
             item['hist_len'][item['hist_len'] == 0] += 1
         return item
 
@@ -302,12 +308,16 @@ class VisDialDataset(Dataset):
         out['hist'] = out['hist'][:, :, :torch.max(out['hist_len'])].contiguous()
         out['ques'] = out['ques'][:, :, :torch.max(out['ques_len'])].contiguous()
         out['ans'] = out['ans'][:, :, :torch.max(out['ans_len'])].contiguous()
-        out['cap'] = out['cap'][:, :torch.max(out['cap_len'])].contiguous()
+        # out['cap'] = out['cap'][:, :torch.max(out['cap_len'])].contiguous()
 
-        out['opt'] = out['opt'][:, :, :, :torch.max(out['opt_len'])].contiguous()
+        # out['opt'] = out['opt'][:, :, :, :torch.max(out['opt_len'])].contiguous()
 
-        batch_keys = ['num_rounds', 'img_feat', 'img_fnames', 'hist', 'hist_len', 'ques', 'ques_len',
-                      'ans', 'ans_len', 'cap', 'cap_len', 'opt', 'opt_len']
+        # batch_keys = ['num_rounds', 'img_feat', 'img_fnames', 'hist', 'hist_len', 'ques', 'ques_len',
+        #               'ans', 'ans_len', 'cap', 'cap_len', 'opt', 'opt_len']
+
+        batch_keys = ['num_rounds', 'hist', 'hist_len', 'ques', 'ques_len',
+                      'ans', 'ans_len']
+
         if dtype != 'test':
             batch_keys.append('ans_ind')
 
@@ -325,10 +335,10 @@ class VisDialDataset(Dataset):
         Process caption as well as history. Optionally, concatenate history
         for lf-encoder.
         """
-        captions = self.data[dtype + '_cap']
+        # captions = self.data[dtype + '_cap']
         questions = self.data[dtype + '_ques']
         ques_len = self.data[dtype + '_ques_len']
-        cap_len = self.data[dtype + '_cap_len']
+        # cap_len = self.data[dtype + '_cap_len']
         max_ques_len = questions.size(2)
 
         answers = self.data[dtype + '_ans']
@@ -347,13 +357,13 @@ class VisDialDataset(Dataset):
 
         # go over each question and append it with answer
         for th_id in range(num_convs):
-            clen = cap_len[th_id]
-            hlen = min(clen, max_ques_len + max_ans_len)
+            # clen = cap_len[th_id]
+            hlen = max_ques_len + max_ans_len
             for round_id in range(num_rounds):
                 if round_id == 0:
                     # first round has caption as history
-                    history[th_id][round_id][:max_ques_len + max_ans_len] \
-                        = captions[th_id][:max_ques_len + max_ans_len]
+                    history[th_id][round_id][0:1] \
+                        = np.array([self.word2ind['<START>'], self.word2ind['<END>']])
                 else:
                     qlen = ques_len[th_id][round_id - 1]
                     alen = ans_len[th_id][round_id - 1]

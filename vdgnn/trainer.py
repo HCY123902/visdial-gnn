@@ -75,7 +75,7 @@ class Trainer(object):
                 for rnd in range(max_num_rounds):
                     round_info = {}
 
-                    round_info['img_feat'] = batch['img_feat']
+                    # round_info['img_feat'] = batch['img_feat']
 
                     round_info['ques'] = batch['ques'][:, rnd, :]
                     round_info['ques_len'] = batch['ques_len'][:, rnd]
@@ -89,6 +89,10 @@ class Trainer(object):
                     enc_output[:, rnd, :] = enc_out
 
                 dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
+
+                # Added temporarily
+                batch['ans_ind'] = torch.tensor([[1] * 10] * 32).cuda()
+                print("ans_ind size: {}".format(batch["ans_ind"].size()))
 
                 cur_loss = criterion(dec_out, batch['ans_ind'].view(-1))
                 cur_loss.backward()
@@ -166,7 +170,7 @@ class Trainer(object):
                 for rnd in range(max_num_rounds):
                     round_info = {}
 
-                    round_info['img_feat'] = batch['img_feat']
+                    # round_info['img_feat'] = batch['img_feat']
 
                     round_info['ques'] = batch['ques'][:, rnd, :]
                     round_info['ques_len'] = batch['ques_len'][:, rnd]
@@ -181,6 +185,10 @@ class Trainer(object):
 
                 dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
                 ranks = scores_to_ranks(dec_out.data)
+
+                # Added temporarily
+                batch['ans_ind'] = 0
+
                 gt_ranks = get_gt_ranks(ranks, batch['ans_ind'].data)
                 all_ranks.append(gt_ranks)
                 if 'gt_relevance' in batch:

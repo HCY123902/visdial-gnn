@@ -23,27 +23,48 @@ class DiscriminativeDecoder(nn.Module):
         self.similarity_score.init_weights(init_type=init_type)
 
     def forward(self, enc_out, batch):
-        options = batch['opt']
-        options_len = batch['opt_len']
+        # options = batch['opt']
+        # options_len = batch['opt_len']
         # word embed options
-        batch_size, num_rounds, num_options, max_opt_len = options.size()
+        # batch_size, num_rounds, num_options, max_opt_len = options.size()
+
+
+        # This is not included in the original repository. It needs to be commented regardless of whether the implementation has been adjusted
         # options = options.view(batch_size * num_rounds, num_options, max_opt_len)
-        options_len = options_len.view(-1, num_options)
+
+
+
+
+        # options_len = options_len.view(-1, num_options)
+
+
+
+
+        # This is not included in the original repository. It needs to be commented regardless of whether the implementation has been adjusted
         # batch_size, num_options, max_opt_len = options.size()
-        options = options.contiguous().view(-1, num_options * max_opt_len)
-        options = self.word_embed(options)
-        options = options.view(-1, num_options, max_opt_len, self.embed_size)
+
+
+
+
+        # options = options.contiguous().view(-1, num_options * max_opt_len)
+        # options = self.word_embed(options)
+        # options = options.view(-1, num_options, max_opt_len, self.embed_size)
 
         # score each option
         scores = []
-        for opt_id in range(num_options):
-            opt = options[:, opt_id, :, :]
-            opt_len = options_len[:, opt_id]
-            opt_embed = self.option_rnn(opt, opt_len)
-            scores.append(torch.sum(opt_embed * enc_out, 1))
+        # for opt_id in range(num_options):
+        #     opt = options[:, opt_id, :, :]
+        #     opt_len = options_len[:, opt_id]
+        #     opt_embed = self.option_rnn(opt, opt_len)
+        #     scores.append(torch.sum(opt_embed * enc_out, 1))
+
+        # Added Temporarily
+        round_count, message_size = enc_out.size()
+        scores = enc_out[:, :100]
 
         # return scores
         scores = torch.stack(scores, 1)
+        print("scores size: {}; enc_out size: {}".format(scores.size(), enc_out.size()))
         # print(scores.size())
         log_probs = self.log_softmax(scores)
         return log_probs
