@@ -1,0 +1,36 @@
+===========================================
+batch_size          : 32
+ckpt                : None
+concat_history      : False
+dataroot            : ./data/v1.0/
+dense_annotations   : visdial_1.0_val_dense_annotations.json
+dialog_train        : visdial_1.0_train.json
+dialog_val          : visdial_1.0_val.json
+dropout             : 0.5
+e_step              : 1
+embed_size          : 300
+gpuid               : 0
+img_feat_size       : 2048
+img_norm            : 1
+img_train           : features_faster_rcnn_x101_train.h5
+img_val             : features_faster_rcnn_x101_val.h5
+in_memory           : False
+isTrain             : True
+log_step            : 100
+lr                  : 0.001
+lr_decay_rate       : 0.9997592083
+m_step              : 3
+message_size        : 512
+min_lr              : 5e-05
+num_epochs          : 20
+num_layers          : 2
+num_train           : None
+num_val             : None
+rnn_hidden_size     : 512
+save_path           : outputs/2021-10-25_23-54-04
+use_cuda            : True
+version             : 1.0
+visdial_data        : visdial_data_trainval.h5
+visdial_params      : visdial_params_trainval.json
+===========================================
+

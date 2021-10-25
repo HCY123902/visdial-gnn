@@ -1,4 +1,10 @@
 import torch
+from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
+from nltk.translate.bleu_score import SmoothingFunction
+import argparse
+import math
+from rouge import Rouge
+import numpy as np
 
 
 def get_gt_ranks(ranks, ans_ind):
@@ -49,3 +55,29 @@ def scores_to_ranks(scores):
             ranks[i][ranked_idx[i][j]] = j
     ranks += 1
     return ranks
+
+def cal_aggregate_BLEU_nltk(refs, tgts):
+    #print(refs)
+    #print(tgts)
+    smoothie = SmoothingFunction().method7
+    weights = [(1, 0, 0, 0), (0.5, 0.5, 0, 0), (0.33, 0.33, 0.33, 0), (0.25, 0.25, 0.25, 0.25)]
+    
+    refs = [[ref.split(' ')] for ref in refs]
+    tgts = [tgt.split(' ') for tgt in tgts]
+    result = []
+    for i in range(0,4):
+        result = result + [corpus_bleu(refs, tgts, weights=weights[i], smoothing_function=smoothie)]
+    return result[0], result[1], result[2], result[3]
+
+def cal_ROUGE(refer, candidate):
+    if len(candidate) == 0:
+        candidate = ['<unk>']
+    elif len(candidate) == 1:
+        candidate.append('<unk>')
+    if len(refer) == 0:
+        refer = ['<unk>']
+    elif len(refer) == 1:
+        refer.append('<unk>')
+    rouge = Rouge()
+    scores = rouge.get_scores(' '.join(candidate), ' '.join(refer))
+    return scores[0]['rouge-2']['f']

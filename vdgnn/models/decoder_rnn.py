@@ -27,7 +27,7 @@ class Decoder_RNN(nn.Module):
                           num_layers=args.num_layers,
                           batch_first=True, 
                           dropout=args.dropout)
-        self.out = nn.Linear(self.hidden_size, output_size)
+        self.out = nn.Linear(self.hidden_size, self.output_size)
 
         # attention on context encoder
         # self.attn = Attention(hidden_size)

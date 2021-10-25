@@ -101,6 +101,8 @@ class VisDialDataset(Dataset):
             int(ind): word_count
             for word, ind in iteritems(self.word2ind)
         }
+        
+        json.dump(self.ind2word, open(args.vocab_path, "w"))
 
         # print("Dataloader loading image h5 file: {}".format(self.input_img))
         # Either img_feats or img_reader will be set.

@@ -6,10 +6,12 @@ import gc
 import os
 import math
 import time
+import json
 from tqdm import tqdm
 from vdgnn.models.decoder_rnn import Decoder_RNN
-from vdgnn.utils.eval_utils import process_ranks, scores_to_ranks, get_gt_ranks
+from vdgnn.utils.eval_utils import *
 from vdgnn.utils.metrics import NDCG
+# from torch.utils.tensorboard import SummaryWriter
 
 class Trainer(object):
     def __init__(self, dataloader, dataloader_val, model_args):
@@ -28,12 +30,15 @@ class Trainer(object):
         self.dataloader_val = dataloader_val
 
         self.model_dir = os.path.join(self.output_dir, 'checkpoints')
+        self.record_path = model_args.record_path
+        self.vocab_path = model_args.vocab_path
+#         self.writer = SummaryWriter(log_dir='../log/dailydialog/')
 
-    def train(self, encoder, decoder, vocab_size):
+    def train(self, encoder, decoder):
 
         #criterion = nn.CrossEntropyLoss()
         # Adjusted
-        nn.NLLLoss(ignore_index=0)
+        criterion = nn.NLLLoss(ignore_index=0)
 
         running_loss = None
 
@@ -41,6 +46,9 @@ class Trainer(object):
                                 lr=self.lr)
 
         scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=self.lr_decay_rate)
+        
+#         title = "dailydialog"args.record_path
+        record_path = self.record_path
 
         if self.ckpt != None:
             components = torch.load(self.ckpt)
@@ -61,6 +69,7 @@ class Trainer(object):
             iter_time = time.time()
 
             for iter, batch in enumerate(self.dataloader):
+                print("[Epoch: {:3d}][Iter: {:6d}] Starts".format(epoch, iter+1))
                 optimizer.zero_grad()
 
                 for key in batch:
@@ -76,7 +85,8 @@ class Trainer(object):
                 dec_output = torch.zeros(batch_size, max_num_rounds, ans_len, decoder.output_size, requires_grad=True)
 
                 if self.use_cuda:
-                    enc_output = enc_output.cuda()
+                    #enc_output = enc_output.cuda()
+                    dec_output = dec_output.cuda()
 
                 # iterate over dialog rounds
                 for rnd in range(max_num_rounds):
@@ -96,7 +106,7 @@ class Trainer(object):
                     # enc_output[:, rnd, :] = enc_out
 
                     # [2, batch_size, hidden_size]
-                    decoder_hidden = torch.stack([enc_out, enc_out], 2)
+                    decoder_hidden = torch.stack([enc_out, enc_out], 0)
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
@@ -135,14 +145,19 @@ class Trainer(object):
                     print("[Epoch: {:3d}][Iter: {:6d}][Loss: {:6f}][lr: {:6f}][Duration: {:6.2f}s]".format(
                         epoch, iter+1, running_loss, optimizer.param_groups[0]['lr'], time.time() - iter_time))
                     iter_time = time.time()
+                    ppl = self.validate(encoder, decoder, epoch, record_path)
+#                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
+                    evaluate_prediction_result(record_path, epoch, ppl)
 
             print("[Epoch: {:3d}][Loss: {:6f}][lr: {:6f}][Time: {:6.2f}s]".format(
                         epoch, running_loss, optimizer.param_groups[0]['lr'], time.time() - epoch_time))
+            self.writer.add_scalar('{}-Loss/train'.format(title), running_loss, epoch)
+            self.writer.add_scalar('{}-lr/train'.format(title), optimizer.param_groups[0]['lr'], epoch)
 
             # --------------------------------------------------------------------
             # Save checkpoints
             # --------------------------------------------------------------------
-            if epoch % 1 == 0:
+            if epoch % 1 == 1:
                 if not os.path.exists(self.model_dir):
                     os.makedirs(self.model_dir)
 
@@ -153,7 +168,9 @@ class Trainer(object):
                     'model_args': self.args
                 }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
 
-                val_res = self.validate(encoder, decoder, epoch)
+                ppl = self.validate(encoder, decoder, epoch)
+#                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
+                self.evaluate_prediction_result(record_path, epoch, ppl)
 
         torch.save({
             'encoder':encoder.state_dict(),
@@ -162,14 +179,19 @@ class Trainer(object):
             'model_args': self.args
         }, os.path.join(self.model_dir, 'model_epoch_final.pth'))
 
-    def validate(self, encoder, decoder, epoch):
+
+    def validate(self, encoder, decoder, epoch, record_path):
         print('Evaluating...')
         encoder.eval()
         decoder.eval()
         ndcg = NDCG()
 
         eval_time = time.time()
-        all_ranks = []
+        
+        total_e = 0
+        batch_number = 0
+        
+        prediction_records = open(record_path, "w")
 
         for i, batch in enumerate(tqdm(self.dataloader_val)):
 
@@ -180,10 +202,13 @@ class Trainer(object):
 
             batch_size, max_num_rounds = batch['ques'].size()[:2]
 
-            enc_output = torch.zeros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
+            # enc_output = torch.zeros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
+            ans_len = batch['ans'].size(2)
+            dec_output = torch.zeros(batch_size, max_num_rounds, ans_len, decoder.output_size, requires_grad=True)
 
             if self.use_cuda:
-                enc_output = enc_output.cuda()
+                # enc_output = enc_output.cuda()
+                dec_output = dec_output.cuda()
 
             # iterate over dialog rounds
             with torch.no_grad():
@@ -201,36 +226,152 @@ class Trainer(object):
 
                     pred_adj_mat, enc_out = encoder(round_info, self.args)
 
-                    enc_output[:, rnd, :] = enc_out
+                    #enc_output[:, rnd, :] = enc_out
+                    
+                    # [2, batch_size, hidden_size]
+                    decoder_hidden = torch.stack([enc_out, enc_out], 0)
 
-                dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
-                ranks = scores_to_ranks(dec_out.data)
+                    # [batch_size, ans_len]
+                    ans_tokens = batch['ans'][:, rnd, :]
+                    # ans_len = batch['ans'].size(2)
 
-                # Added temporarily
-                batch['ans_ind'] = 0
+                    out = decoder(ans_tokens, decoder_hidden)
+                    
+                    dec_output[:, rnd, :, :] = out
+                    
+                    self.translate(out, ans_tokens, round_info['hist'], prediction_records)
+                    
 
-                gt_ranks = get_gt_ranks(ranks, batch['ans_ind'].data)
-                all_ranks.append(gt_ranks)
-                if 'gt_relevance' in batch:
-                    num_opts = dec_out.size(1)
-                    output = dec_out.view(batch_size, max_num_rounds, num_opts)
-                    output = output[torch.arange(batch_size), batch['round_id']-1, :]
-                    ndcg.observe(output, batch['gt_relevance'])
+                    
+                cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'].view(-1))
+                batch_number = batch_number + 1
+                total_e = total_e + cur_loss.item()
+        
+        
+        prediction_records.close()
+        
+        l = round(total_loss / batch_num, 4)
+        ppl = math.exp(l)
 
-        all_ranks = torch.cat(all_ranks, 0)
-        eval_res = process_ranks(all_ranks)
-        eval_res['ndcg'] = ndcg.retrieve(reset=True)
-
-        print("[Epoch: {:3d}][R@1: {:6f}][R@5: {:6f}][R@10: {:6f}][MR: {:6f}][MRR: {:6f}][NDCG: {:6f}][Time: {:6.2f}s]".format(epoch,
-                        eval_res['r_1'],
-                        eval_res['r_5'],
-                        eval_res['r_10'],
-                        eval_res['mr'],
-                        eval_res['mrr'],
-                        eval_res['ndcg'],
-                        time.time() - eval_time))
         gc.collect()
 
-        return eval_res
+        return ppl
 
+    def translate(self, prediction, reference, source, record):
+        ind2word = json.load(open(self.vocab_path, "r"))
+        
+        end_token = len(ind2word)
+        
+        batch_size, ans_len = prediction.size()[:2]
+        _, rounds, hist_len = source.size()
+        
+        # [batch_size, ans_len]
+        tokens = prediction.max(2)[1]
+        
+        for i in range(batch_size):
+            pred = list(map(int, tokens[i, :].tolist()))
+            end_index = pred.index(0) if 0 in pred else len(pred)
+            end_index_ = pred.index(end_token) if end_token in pred else len(pred)
+            #end_index = min(end_index, end_index_)
+            pred = pred[:min(end_index, end_index_)]
+            pred = [ind2word.get(token, '<UNK>') for token in pred]
+            pred = ' '.join(pred)
+            pred.replace('<START>', '').strip()
+            pred.replace('<END>', '').strip()
+        
+            ref = list(map(int, reference[i, :].tolist()))
+            end_index = ref.index(0) if 0 in ref else len(ref)
+            end_index_ = ref.index(end_token) if end_token in ref else len(ref)
+
+            ref = pred[:min(end_index, end_index_)]
+            ref = [ind2word.get(token, '<UNK>') for token in ref]
+            ref = ' '.join(ref)
+            ref.replace('<START>', '').strip()
+            ref.replace('<END>', '').strip()
+            
+            src_list = []
+            for r in range(rounds):
+                src = list(map(int, source[i, r, :].tolist()))
+                end_index = src.index(0) if 0 in src else len(src)
+                end_index_ = src.index(end_token) if end_token in src else len(src)
+                src = pred[:min(end_index, end_index_)]
+                src = [ind2word.get(token, '<UNK>') for token in src]
+                src_list.append(' '.join(src))
+            src = ' __eou__ '.join(src_list)
+            
+            record.write('- src: {}\n'.format(src))
+            record.write('- ref: {}\n'.format(ref))
+            record.write('- tgt: {}\n\n'.format(pred))
+   
+    
+    def evaluate_prediction_result(self, pred_path, epoch, ppl):
+        # obtain the performance
+        print('[!] measure the performance and write into tensorboard')
+        with open(pred_path) as f:
+            ref, tgt = [], []
+            for idx, line in enumerate(f.readlines()):
+                line = line.lower()    # lower the case
+                if idx % 4 == 1:
+                    line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+                    ref.append(line.split())
+                elif idx % 4 == 2:
+                    line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+                    tgt.append(line.split())
+
+        assert len(ref) == len(tgt)
+
+        # ROUGE
+        rouge_sum, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, counter = 0, 0, 0, 0, 0, 0
+        for rr, cc in tqdm(list(zip(ref, tgt))):
+            rouge_sum += cal_ROUGE(rr, cc)
+            # rouge_sum += 0.01
+            counter += 1
+
+        # BlEU
+        refs, tgts = [' '.join(i) for i in ref], [' '.join(i) for i in tgt]
+        bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum = cal_aggregate_BLEU_nltk(refs, tgts)
+
+#         # Distinct-1, Distinct-2
+#         candidates, references = [], []
+#         for line1, line2 in zip(tgt, ref):
+#             candidates.extend(line1)
+#             references.extend(line2)
+#         distinct_1, distinct_2 = cal_Distinct(candidates)
+#         rdistinct_1, rdistinct_2 = cal_Distinct(references)
+
+        # Embedding-based metric: Embedding Average (EA), Vector Extrema (VX), Greedy Matching (GM)
+        # load the dict
+        # with open('./data/glove_embedding.pkl', 'rb') as f:
+        #     dic = pickle.load(f)
+#         dic = gensim.models.KeyedVectors.load_word2vec_format('./data/GoogleNews-vectors-negative300.bin', binary=True)
+#         print('[!] load the GoogleNews 300 word2vector by gensim over')
+#         ea_sum, vx_sum, gm_sum, counterp = 0, 0, 0, 0
+#         for rr, cc in tqdm(list(zip(ref, tgt))):
+#             ea_sum += cal_embedding_average(rr, cc, dic)
+#             vx_sum += cal_vector_extrema(rr, cc, dic)
+#             gm_sum += cal_greedy_matching_matrix(rr, cc, dic)
+#             counterp += 1
+
+        # write into the tensorboard
+#         writer.add_scalar('{}-Performance/PPL'.format(title), ppl, epoch)
+#         writer.add_scalar('{}-Performance/BLEU-1'.format(title), bleu1_sum, epoch)
+#         writer.add_scalar('{}-Performance/BLEU-2'.format(title), bleu2_sum, epoch)
+#         writer.add_scalar('{}-Performance/BLEU-3'.format(title), bleu3_sum, epoch)
+#         writer.add_scalar('{}-Performance/BLEU-4'.format(title), bleu4_sum, epoch)
+#         writer.add_scalar('{}-Performance/ROUGE'.format(title), rouge_sum / counter, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Distinct-1', distinct_1, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Distinct-2', distinct_2, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-1', rdistinct_1, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-2', rdistinct_2, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Embedding-Average', ea_sum / counterp, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Vector-Extrema', vx_sum / counterp, epoch)
+#         writer.add_scalar(f'{writer_str}-Performance/Greedy-Matching', gm_sum / counterp, epoch)
+
+        print("[Epoch: {:3d}][BLEU-1: {:6f}][BLEU-2: {:6f}][BLEU-3: {:6f}][BLEU-4: {:6f}][ROUGE: {:6f}][PPL: {:6f}]".format(
+                        epoch, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, rouge_sum / counter, ppl))
+
+        # write now
+        # writer.flush()
+        
+        
 
