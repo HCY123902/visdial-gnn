@@ -145,14 +145,14 @@ class Trainer(object):
                     print("[Epoch: {:3d}][Iter: {:6d}][Loss: {:6f}][lr: {:6f}][Duration: {:6.2f}s]".format(
                         epoch, iter+1, running_loss, optimizer.param_groups[0]['lr'], time.time() - iter_time))
                     iter_time = time.time()
-                    ppl = self.validate(encoder, decoder, epoch, record_path)
+                    ppl = self.validate(encoder, decoder, criterion, record_path)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
-                    evaluate_prediction_result(record_path, epoch, ppl)
+                    self.evaluate_prediction_result(record_path, epoch, ppl)
 
             print("[Epoch: {:3d}][Loss: {:6f}][lr: {:6f}][Time: {:6.2f}s]".format(
                         epoch, running_loss, optimizer.param_groups[0]['lr'], time.time() - epoch_time))
-            self.writer.add_scalar('{}-Loss/train'.format(title), running_loss, epoch)
-            self.writer.add_scalar('{}-lr/train'.format(title), optimizer.param_groups[0]['lr'], epoch)
+            # self.writer.add_scalar('{}-Loss/train'.format(title), running_loss, epoch)
+            # self.writer.add_scalar('{}-lr/train'.format(title), optimizer.param_groups[0]['lr'], epoch)
 
             # --------------------------------------------------------------------
             # Save checkpoints
@@ -180,7 +180,7 @@ class Trainer(object):
         }, os.path.join(self.model_dir, 'model_epoch_final.pth'))
 
 
-    def validate(self, encoder, decoder, epoch, record_path):
+    def validate(self, encoder, decoder, criterion, record_path):
         print('Evaluating...')
         encoder.eval()
         decoder.eval()
@@ -250,7 +250,7 @@ class Trainer(object):
         
         prediction_records.close()
         
-        l = round(total_loss / batch_num, 4)
+        l = round(total_e / batch_number, 4)
         ppl = math.exp(l)
 
         gc.collect()
