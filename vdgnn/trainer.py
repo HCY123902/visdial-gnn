@@ -7,6 +7,7 @@ import os
 import math
 import time
 from tqdm import tqdm
+from vdgnn.models.decoder_rnn import Decoder_RNN
 from vdgnn.utils.eval_utils import process_ranks, scores_to_ranks, get_gt_ranks
 from vdgnn.utils.metrics import NDCG
 
@@ -28,9 +29,12 @@ class Trainer(object):
 
         self.model_dir = os.path.join(self.output_dir, 'checkpoints')
 
-    def train(self, encoder, decoder):
+    def train(self, encoder, decoder, vocab_size):
 
-        criterion = nn.CrossEntropyLoss()
+        #criterion = nn.CrossEntropyLoss()
+        # Adjusted
+        nn.NLLLoss(ignore_index=0)
+
         running_loss = None
 
         optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()),
@@ -66,7 +70,10 @@ class Trainer(object):
 
                 batch_size, max_num_rounds = batch['ques'].size()[:2]
 
-                enc_output = torch.zeros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
+                # enc_output = torch.zedros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
+                # Adjusted
+                ans_len = batch['ans'].size(2)
+                dec_output = torch.zeros(batch_size, max_num_rounds, ans_len, decoder.output_size, requires_grad=True)
 
                 if self.use_cuda:
                     enc_output = enc_output.cuda()
@@ -86,15 +93,28 @@ class Trainer(object):
 
                     pred_adj_mat, enc_out = encoder(round_info, self.args)
 
-                    enc_output[:, rnd, :] = enc_out
+                    # enc_output[:, rnd, :] = enc_out
 
-                dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
+                    # [2, batch_size, hidden_size]
+                    decoder_hidden = torch.stack([enc_out, enc_out], 2)
 
-                # Added temporarily
-                ans_ind = torch.tensor([[1] * 10] * 32).cuda()
-                print("ans_ind size: {}".format(ans_ind.size()))
+                    # [batch_size, ans_len]
+                    ans_tokens = batch['ans'][:, rnd, :]
+                    # ans_len = batch['ans'].size(2)
 
-                cur_loss = criterion(dec_out, ans_ind.view(-1))
+                    out = decoder(ans_tokens, decoder_hidden)
+
+                    dec_output[:, rnd, :, :] = out
+
+                # dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
+                
+                # # Added temporarily
+                # ans_ind = torch.tensor([[1] * 10] * 32).cuda()
+                # print("ans_ind size: {}".format(ans_ind.size()))
+
+                # cur_loss = criterion(dec_out, ans_ind.view(-1))
+                cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'].view(-1))
+                
                 cur_loss.backward()
 
                 optimizer.step()

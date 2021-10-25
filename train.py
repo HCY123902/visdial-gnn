@@ -4,6 +4,7 @@ import time
 import os
 from vdgnn.dataset.dataloader import VisDialDataset
 from torch.utils.data import DataLoader
+from vdgnn.models.decoder_rnn import Decoder_RNN
 from vdgnn.models.encoder import GCNNEncoder
 from vdgnn.models.decoder import DiscriminativeDecoder
 from vdgnn.options.train_options import TrainOptions
@@ -45,7 +46,8 @@ if __name__ == '__main__':
 
     encoder = GCNNEncoder(model_args)
 
-    decoder = DiscriminativeDecoder(model_args, encoder)
+    # decoder = DiscriminativeDecoder(model_args, encoder)
+    decoder = Decoder_RNN(model_args, encoder)
 
     trainer = Trainer(dataloader, dataloader_val, model_args)
 
