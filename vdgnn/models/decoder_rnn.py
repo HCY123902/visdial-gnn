@@ -27,7 +27,7 @@ class Decoder_RNN(nn.Module):
         self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size,
                           num_layers=args.num_layers,
                           batch_first=True, 
-                          dropout=args.dropout)
+                          dropout=args.decoder_dropout)
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
         # attention on context encoder
@@ -95,12 +95,25 @@ class Decoder_RNN(nn.Module):
                 output[:, i, :] = current
                 #l.append(current)
                 current = F.log_softmax(current, dim=1)
-                current = current.max(1)[1]
+                
+                
+                
+                current = current.max(1)[1].detach()
                 
                 
                 
         output = F.log_softmax(output, dim=2)
         return output
+    
+#     def sample(preds, temperature=0.1):
+#         # helper function to sample an index from a probability array
+#         s = nn.Softmax(dim=1)
+#         preds = 
+#         preds = np.log(preds) / temperature
+#         exp_preds = np.exp(preds)
+#         preds = exp_preds / np.sum(exp_preds)
+#         probas = np.random.multinomial(1, preds, 1)
+#         return np.argmax(probas)
     
     
 

@@ -37,6 +37,7 @@ class BaseOptions():
         parser.add_argument('--rnn_hidden_size', default=512, type=int, help='size of the multimodal embedding')
         parser.add_argument('--num_layers', default=2, type=int, help='number of layers in LSTM')
         parser.add_argument('--dropout', default=0.5, type=float, help='dropout rate')
+        parser.add_argument('--decoder_dropout', default=0.3, type=float, help='the decoder response generation dropout rate')
         parser.add_argument('--message_size', default=512, type=int, help='message passing size')
         parser.add_argument('--m_step', default=3, type=int, help='number of steps for EM-Learning')
         parser.add_argument('--e_step', default=1, type=int, help='number of propagation steps for message passing')
