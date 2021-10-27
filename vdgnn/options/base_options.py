@@ -28,7 +28,8 @@ class BaseOptions():
         parser.add_argument('--num_val', default=None, type=int, help='number of datapoints to validate [None for all data]')
         parser.add_argument('--gpuid', default=0, type=int, help='GPU id to use, use -1 for CPU')
         parser.add_argument('--vocab_path', default='./data/v1.0/vocab.json', help='vocab path')
-        parser.add_argument('--record_path', default='./log/prediction.txt', help='record path')
+        parser.add_argument('--record_path', default='./tblog/prediction_{}.txt', help='record path')
+        parser.add_argument('--teach_force', default=0.5, type=float, help='teach force')
         # Model settings
         parser.add_argument_group('Model related arguments')
         parser.add_argument('--img_feat_size', default=2048, type=int, help='channel size of input image feature')

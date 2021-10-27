@@ -122,4 +122,4 @@ class GCNNEncoder(nn.Module):
                     if s == self.e_step - 1:
                         pred_node_feats[t+1][:, :, z] = h_z.squeeze(0)
 
-        return pred_adj_mat, pred_node_feats[self.m_step][:,:,num_nodes-1]
+        return pred_adj_mat, pred_node_feats[self.m_step][:,:,num_nodes-1], pred_node_feats[self.m_step][:,:,:num_nodes-1]

@@ -5,6 +5,7 @@ import torch.nn.init as init
 import random
 import numpy as np
 import ipdb
+from .layers import *
 
 class Decoder_RNN(nn.Module):
 
@@ -23,14 +24,14 @@ class Decoder_RNN(nn.Module):
         self.embed_size = args.embed_size
 
         # number of layers should be 2
-        self.gru = nn.GRU(self.embed_size, self.hidden_size,
+        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size,
                           num_layers=args.num_layers,
                           batch_first=True, 
                           dropout=args.dropout)
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
         # attention on context encoder
-        # self.attn = Attention(hidden_size)
+        self.attn = Attention(self.hidden_size)
 
         self.init_weight()
 
@@ -40,33 +41,67 @@ class Decoder_RNN(nn.Module):
         self.gru.bias_ih_l0.data.fill_(0.0)
         self.gru.bias_hh_l0.data.fill_(0.0)
 
-    def forward(self, inpt, last_hidden):
-        # inpt: [batch_size], last_hidden: [2, batch, hidden_size]
-        # encoder_outputs: [turn_len, batch, hidden_size]
+    def forward(self, inpt, last_hidden, encoder_outputs, ans_len=20, is_train=True):
+        # inpt: [batch_size, ans_len], last_hidden: [2, batch, hidden_size]
+        # encoder_outputs: [batch, turn_len, hidden_size]
 
-        # batch first: [batch, ans_len, vocab size]
-        embedded = self.word_embed(inpt)
-        # key = last_hidden.sum(axis=0)    # [batch, hidden_size]
+        if is_train:
+            
+#             key = last_hidden.sum(axis=0)    # [batch, hidden_size]
 
-        # [batch, 1, seq_len]
-        # attn_weights = self.attn(key, encoder_outputs)
-        # context = attn_weights.bmm(encoder_outputs.transpose(0, 1))
-        # context = context.transpose(0, 1)    # [1, batch, hidden]
+#             # [batch, 1, seq_len]
+#             attn_weights = self.attn(key, encoder_outputs)
+#             context = attn_weights.bmm(encoder_outputs.transpose(0, 1))
+#             context = context.transpose(0, 1)    # [1, batch, hidden]
+            ans_len = inpt.size(1)
+            embedded = self.word_embed(inpt)    # [batch_size, ans_len, embed_size]
+            key = last_hidden.sum(dim=0)    # [batch, hidden_size]
+            
+            attn_weights = self.attn(key, encoder_outputs) # [batch, 1, timestep]
+            context = attn_weights.bmm(encoder_outputs) # [batch, 1, hidden]
+            context = context.repeat(1, ans_len, 1) # [batch, ans_len, hidden]
+            # context = context.transpose(0, 1)    # [1, batch, hidden]
 
-        # rnn_input = torch.cat([embedded, context], 2)   # [1, batch, embed+hidden]
+            rnn_input = torch.cat([embedded, context], 2)   # [batch, ans_len, embed+hidden]
+            # batch first: [batch, ans_len, vocab size]
+            
+            
+            # output: [batch, ans_len, hidden_size], hidden: [2, batch, hidden_size]
+            output, _ = self.gru(rnn_input, last_hidden)
+            
+            output = self.out(output)     # [batch, ans_len, output_size]
+        else:
+            output = torch.zeros(inpt.size(0), ans_len, self.output_size, requires_grad=True)
+            output = output.cuda()
+            #l = []
+            current = inpt
+            hidden = last_hidden
+            for i in range(0, ans_len):
+                embedded = self.word_embed(current).unsqueeze(1) # [batch_size, 1, embed_size]
+                
+                key = hidden.sum(dim=0)    # [batch, hidden_size]
+            
+                attn_weights = self.attn(key, encoder_outputs) # [batch, 1, timestep]
+                context = attn_weights.bmm(encoder_outputs) # [batch, 1, hidden]
+                # context = context.repeat(1, ans_len, 1) # [batch, ans_len, hidden]
+                # context = context.transpose(0, 1)    # [1, batch, hidden]
 
-        # output: [batch, ans_len, hidden_size], hidden: [2, batch, hidden_size]
-        output, _ = self.gru(embedded, last_hidden)
-
-
-        # output = output.squeeze(0)    # [batch, hidden_size]
-
-
-        # context = context.squeeze(0)  # [batch, hidden]
-        # output = torch.cat([output, context], 1)    # [batch, 2 * hidden]
-
-
-        output = self.out(output)     # [batch, ans_len, output_size]
+                rnn_input = torch.cat([embedded, context], 2)   # [batch, 1, embed+hidden]
+                
+                current, hidden = self.gru(rnn_input, hidden)
+                # [batch, vocab_size]
+                current = self.out(current).squeeze(1)
+                
+                output[:, i, :] = current
+                #l.append(current)
+                current = F.log_softmax(current, dim=1)
+                current = current.max(1)[1]
+                
+                
+                
         output = F.log_softmax(output, dim=2)
         return output
+    
+    
+
         

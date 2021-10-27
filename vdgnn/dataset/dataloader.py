@@ -98,7 +98,7 @@ class VisDialDataset(Dataset):
 
         # construct reverse of word2ind after adding tokens
         self.ind2word = {
-            int(ind): word_count
+            int(ind): word
             for word, ind in iteritems(self.word2ind)
         }
         
@@ -357,18 +357,18 @@ class VisDialDataset(Dataset):
 
         if self.args.concat_history:
             self.max_hist_len = min(
-                num_rounds * (max_ques_len + max_ans_len), 300)
+                num_rounds * max_ques_len, 300)
             history = torch.zeros(num_convs, num_rounds,
                                   self.max_hist_len).long()
         else:
             history = torch.zeros(num_convs, num_rounds,
-                                  max_ques_len + max_ans_len).long()
+                                  max_ques_len).long()
         hist_len = torch.zeros(num_convs, num_rounds).long()
 
         # go over each question and append it with answer
         for th_id in range(num_convs):
             # clen = cap_len[th_id]
-            hlen = max_ques_len + max_ans_len
+            hlen = max_ques_len
             for round_id in range(num_rounds):
                 if round_id == 0:
                     # first round has caption as history
@@ -376,7 +376,7 @@ class VisDialDataset(Dataset):
                         = torch.tensor(np.array([self.word2ind['<START>'], self.word2ind['<END>']]))
                 else:
                     qlen = ques_len[th_id][round_id - 1]
-                    alen = ans_len[th_id][round_id - 1]
+                    # alen = ans_len[th_id][round_id - 1]
                     # if concat_history, string together all previous question-answer pairs
                     if self.args.concat_history:
                         history[th_id][round_id][:hlen] = history[th_id][round_id - 1][:hlen]
@@ -384,19 +384,19 @@ class VisDialDataset(Dataset):
                         if qlen > 0:
                             history[th_id][round_id][hlen + 1:hlen + qlen + 1] \
                                 = questions[th_id][round_id - 1][:qlen]
-                        if alen > 0:
-                            # print(round_id, history[th_id][round_id][:10], answers[th_id][round_id][:10])
-                            history[th_id][round_id][hlen + qlen + 1:hlen + qlen + alen + 1] \
-                                = answers[th_id][round_id - 1][:alen]
-                        hlen = hlen + qlen + alen + 1
+#                         if alen > 0:
+#                             # print(round_id, history[th_id][round_id][:10], answers[th_id][round_id][:10])
+#                             history[th_id][round_id][hlen + qlen + 1:hlen + qlen + alen + 1] \
+#                                 = answers[th_id][round_id - 1][:alen]
+                        hlen = hlen + qlen + 1
                     # else, history is just previous round question-answer pair
                     else:
                         if qlen > 0:
                             history[th_id][round_id][:qlen] = questions[th_id][round_id - 1][:qlen]
-                        if alen > 0:
-                            history[th_id][round_id][qlen:qlen + alen] \
-                                = answers[th_id][round_id - 1][:alen]
-                        hlen = alen + qlen
+#                         if alen > 0:
+#                             history[th_id][round_id][qlen:qlen + alen] \
+#                                 = answers[th_id][round_id - 1][:alen]
+                        hlen = qlen
                 # save the history length
                 hist_len[th_id][round_id] = hlen
 

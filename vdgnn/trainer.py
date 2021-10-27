@@ -12,6 +12,7 @@ from vdgnn.models.decoder_rnn import Decoder_RNN
 from vdgnn.utils.eval_utils import *
 from vdgnn.utils.metrics import NDCG
 # from torch.utils.tensorboard import SummaryWriter
+import random
 
 class Trainer(object):
     def __init__(self, dataloader, dataloader_val, model_args):
@@ -33,12 +34,21 @@ class Trainer(object):
         self.record_path = model_args.record_path
         self.vocab_path = model_args.vocab_path
 #         self.writer = SummaryWriter(log_dir='../log/dailydialog/')
+        self.teach_force = model_args.teach_force
+    
+        vocab = open(self.vocab_path, "r")
+        ind2word = json.load(vocab)
+        ind2word[0] = "<PAD>"
+        self.ind2word = ind2word
+        self.sos = len(ind2word) - 2
+        vocab.close()
 
     def train(self, encoder, decoder):
 
         #criterion = nn.CrossEntropyLoss()
         # Adjusted
-        criterion = nn.NLLLoss(ignore_index=0)
+#        criterion = nn.NLLLoss(ignore_index=0)
+        criterion = nn.NLLLoss()
 
         running_loss = None
 
@@ -101,18 +111,27 @@ class Trainer(object):
                     round_info['hist_len'] = batch['hist_len'][:, :rnd+1]
                     round_info['round'] = rnd
 
-                    pred_adj_mat, enc_out = encoder(round_info, self.args)
+                    pred_adj_mat, enc_out, context_out = encoder(round_info, self.args)
+                    context_out = context_out.transpose(1, 2).contiguous()
+                    # print(enc_out)
 
                     # enc_output[:, rnd, :] = enc_out
 
                     # [2, batch_size, hidden_size]
-                    decoder_hidden = torch.stack([enc_out, enc_out], 0)
+                    initial_hidden = torch.stack([enc_out, enc_out], 0)
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
                     # ans_len = batch['ans'].size(2)
-
-                    out = decoder(ans_tokens, decoder_hidden)
+                    
+                    use_teacher = random.random() < self.teach_force
+                    if use_teacher:
+                        out = decoder(ans_tokens, initial_hidden, context_out)
+                    else:
+#                         start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
+#                         if self.use_cuda:
+#                             start_tokens = start_tokens.cuda()
+                        out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
 
                     dec_output[:, rnd, :, :] = out
 
@@ -145,9 +164,11 @@ class Trainer(object):
                     print("[Epoch: {:3d}][Iter: {:6d}][Loss: {:6f}][lr: {:6f}][Duration: {:6.2f}s]".format(
                         epoch, iter+1, running_loss, optimizer.param_groups[0]['lr'], time.time() - iter_time))
                     iter_time = time.time()
-                    ppl = self.validate(encoder, decoder, criterion, record_path)
+                    ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
-                    self.evaluate_prediction_result(record_path, epoch, ppl)
+                    self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
+                    encoder.train()
+                    decoder.train()
 
             print("[Epoch: {:3d}][Loss: {:6f}][lr: {:6f}][Time: {:6.2f}s]".format(
                         epoch, running_loss, optimizer.param_groups[0]['lr'], time.time() - epoch_time))
@@ -157,20 +178,20 @@ class Trainer(object):
             # --------------------------------------------------------------------
             # Save checkpoints
             # --------------------------------------------------------------------
-            if epoch % 1 == 1:
+            if epoch % 1 == 0:
                 if not os.path.exists(self.model_dir):
                     os.makedirs(self.model_dir)
 
-                torch.save({
-                    'encoder':encoder.state_dict(),
-                    'decoder':decoder.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'model_args': self.args
-                }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
+#                 torch.save({
+#                     'encoder':encoder.state_dict(),
+#                     'decoder':decoder.state_dict(),
+#                     'optimizer': optimizer.state_dict(),
+#                     'model_args': self.args
+#                 }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
 
-                ppl = self.validate(encoder, decoder, epoch)
+                ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
-                self.evaluate_prediction_result(record_path, epoch, ppl)
+                self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
 
         torch.save({
             'encoder':encoder.state_dict(),
@@ -180,7 +201,7 @@ class Trainer(object):
         }, os.path.join(self.model_dir, 'model_epoch_final.pth'))
 
 
-    def validate(self, encoder, decoder, criterion, record_path):
+    def validate(self, encoder, decoder, record_path, epoch):
         print('Evaluating...')
         encoder.eval()
         decoder.eval()
@@ -188,12 +209,19 @@ class Trainer(object):
 
         eval_time = time.time()
         
-        total_e = 0
+        total_e = None
         batch_number = 0
+        
+#         criterion = nn.NLLLoss(ignore_index=0)
+        criterion = nn.NLLLoss()
+    
+        
         
         prediction_records = open(record_path, "w")
 
-        for i, batch in enumerate(tqdm(self.dataloader_val)):
+        
+
+        for i, batch in enumerate(tqdm(self.dataloader)):
 
             for key in batch:
                 if not isinstance(batch[key], list):
@@ -224,41 +252,54 @@ class Trainer(object):
                     round_info['hist_len'] = batch['hist_len'][:, :rnd+1]
                     round_info['round'] = rnd
 
-                    pred_adj_mat, enc_out = encoder(round_info, self.args)
+                    pred_adj_mat, enc_out, context_out = encoder(round_info, self.args)
+                    context_out = context_out.transpose(1, 2).contiguous()
 
                     #enc_output[:, rnd, :] = enc_out
                     
                     # [2, batch_size, hidden_size]
-                    decoder_hidden = torch.stack([enc_out, enc_out], 0)
+                    initial_hidden = torch.stack([enc_out, enc_out], 0)
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
                     # ans_len = batch['ans'].size(2)
+                    
+#                     start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
+#                     if self.use_cuda:
+#                             start_tokens = start_tokens.cuda()
 
-                    out = decoder(ans_tokens, decoder_hidden)
+                    out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
                     
                     dec_output[:, rnd, :, :] = out
                     
-                    self.translate(out, ans_tokens, round_info['hist'], prediction_records)
+                    self.translate(round_info['hist'], round_info['ques'], out, ans_tokens, prediction_records)
                     
 
                     
                 cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'].view(-1))
                 batch_number = batch_number + 1
-                total_e = total_e + cur_loss.item()
+                #total_e = total_e + int(cur_loss.data)
+                
+                if total_e is not None:
+                    total_e = total_e + cur_loss.data
+                else:
+                    total_e = cur_loss.data
         
         
         prediction_records.close()
         
-        l = round(total_e / batch_number, 4)
+        l = round(total_e.item() / batch_number, 4)
         ppl = math.exp(l)
 
         gc.collect()
 
         return ppl
 
-    def translate(self, prediction, reference, source, record):
-        ind2word = json.load(open(self.vocab_path, "r"))
+    def translate(self, source, question, prediction, reference, record):
+        
+#         ind2word = json.load()
+#        ind2word[0] = "<PAD>"
+        ind2word = self.ind2word
         
         end_token = len(ind2word)
         
@@ -269,53 +310,68 @@ class Trainer(object):
         tokens = prediction.max(2)[1]
         
         for i in range(batch_size):
-            pred = list(map(int, tokens[i, :].tolist()))
-            end_index = pred.index(0) if 0 in pred else len(pred)
-            end_index_ = pred.index(end_token) if end_token in pred else len(pred)
-            #end_index = min(end_index, end_index_)
-            pred = pred[:min(end_index, end_index_)]
-            pred = [ind2word.get(token, '<UNK>') for token in pred]
-            pred = ' '.join(pred)
-            pred.replace('<START>', '').strip()
-            pred.replace('<END>', '').strip()
-        
-            ref = list(map(int, reference[i, :].tolist()))
-            end_index = ref.index(0) if 0 in ref else len(ref)
-            end_index_ = ref.index(end_token) if end_token in ref else len(ref)
-
-            ref = pred[:min(end_index, end_index_)]
-            ref = [ind2word.get(token, '<UNK>') for token in ref]
-            ref = ' '.join(ref)
-            ref.replace('<START>', '').strip()
-            ref.replace('<END>', '').strip()
-            
             src_list = []
             for r in range(rounds):
                 src = list(map(int, source[i, r, :].tolist()))
                 end_index = src.index(0) if 0 in src else len(src)
                 end_index_ = src.index(end_token) if end_token in src else len(src)
-                src = pred[:min(end_index, end_index_)]
-                src = [ind2word.get(token, '<UNK>') for token in src]
+                src = src[:min(end_index, end_index_)]
+                src = [ind2word.get(str(token), '<UNK>') for token in src]
                 src_list.append(' '.join(src))
             src = ' __eou__ '.join(src_list)
             
+            ques = list(map(int, question[i, :].tolist()))
+            end_index = ques.index(0) if 0 in ques else len(ques)
+            end_index_ = ques.index(end_token) if end_token in ques else len(ques)
+            #end_index = min(end_index, end_index_)
+            ques = ques[:min(end_index, end_index_)]
+            ques = [ind2word.get(str(token), '<UNK>') for token in ques]
+            ques = ' '.join(ques)
+            ques.replace('<START>', '').strip()
+            ques.replace('<END>', '').strip()
+            
+            pred = list(map(int, tokens[i, :].tolist()))
+            end_index = pred.index(0) if 0 in pred else len(pred)
+            end_index_ = pred.index(end_token) if end_token in pred else len(pred)
+            #end_index = min(end_index, end_index_)
+            pred = pred[:min(end_index, end_index_)]
+            pred = [ind2word.get(str(token), '<UNK>') for token in pred]
+            pred = ' '.join(pred)
+            pred.replace('<START>', '').strip()
+            pred.replace('<END>', '').strip()
+        
+            ref = list(map(int, reference[i, :].tolist()))
+            # print(ref)
+            end_index = ref.index(0) if 0 in ref else len(ref)
+            end_index_ = ref.index(end_token) if end_token in ref else len(ref)
+
+            ref = ref[:min(end_index, end_index_)]
+            
+            ref = [ind2word.get(str(token), '<UNK>') for token in ref]
+            ref = ' '.join(ref)
+            ref.replace('<START>', '').strip()
+            ref.replace('<END>', '').strip()
+            
             record.write('- src: {}\n'.format(src))
+            record.write('- que: {}\n'.format(ques))
             record.write('- ref: {}\n'.format(ref))
             record.write('- tgt: {}\n\n'.format(pred))
    
     
     def evaluate_prediction_result(self, pred_path, epoch, ppl):
         # obtain the performance
-        print('[!] measure the performance and write into tensorboard')
+        # print('[!] measure the performance and write into tensorboard')
         with open(pred_path) as f:
             ref, tgt = [], []
             for idx, line in enumerate(f.readlines()):
                 line = line.lower()    # lower the case
-                if idx % 4 == 1:
+                if idx % 5 == 2:
                     line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+                    # print(line)
                     ref.append(line.split())
-                elif idx % 4 == 2:
+                elif idx % 5 == 3:
                     line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+                    # print(line)
                     tgt.append(line.split())
 
         assert len(ref) == len(tgt)
