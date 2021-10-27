@@ -159,10 +159,20 @@ class DecoderRNN(BaseRNN):
             # beam search: repeat the initial states of the RNN
             # dec_init_state: [num_directions, batch, hidden_size]
             decoder_hidden_state = []
-            for d in dec_init_state:
-                dd = th.cat([d.squeeze(0)]*beam_size, dim=-1).view(1, batch_size*beam_size, -1) # [1,b*k,h]
-                decoder_hidden_state.append(dd)
-            decoder_hidden_state = tuple(decoder_hidden_state)
+#             for d in dec_init_state:
+#                 dd = th.cat([d.squeeze(0)]*beam_size, dim=-1).view(1, batch_size*beam_size, -1) # [1,b*k,h]
+#                 # dd = th.cat([d.squeeze(0)]*beam_size, dim=-1).view(batch_size*beam_size, -1) # [b*k,h]
+#                 # print(dd.size())
+#                 decoder_hidden_state.append(dd)
+            dd = th.cat([dec_init_state]*beam_size, dim=-1).view(2, batch_size*beam_size, -1)
+    
+#             print("--------decoder_hidden_state_size: ", dd.size())
+        
+            decoder_hidden_state = (dd, dd.clone())
+            
+            # decoder_hidden_state = tuple(decoder_hidden_state)
+            # decoder_hidden_state = th.stack(decoder_hidden_state, 0)
+            # print(decoder_hidden_state.size())
             if attn_context is not None:
                 attn_context = th.cat([attn_context]*beam_size, dim=-1).reshape(-1, attn_context.shape[1], attn_context.shape[2]) # [b*k,y_size,d]
 
@@ -179,6 +189,8 @@ class DecoderRNN(BaseRNN):
             #           decoder_hidden_state = the embedding of selected z, with size (b, d)
             #           attn_context = the full map of embedding of all possible z, with size (b, m, d)
             #           goal = None
+            # print(decoder_hidden_state.size())
+            decoder_hidden_state = (decoder_hidden_state, decoder_hidden_state.clone())
             prob_outputs, decoder_hidden_state, attn, logits = self.forward_step(input_var=decoder_input, hidden_state=decoder_hidden_state, encoder_outputs=attn_context, goal_hid=goal_hid)
 
 
@@ -190,12 +202,19 @@ class DecoderRNN(BaseRNN):
             ind = th.LongTensor([i*beam_size for i in range(batch_size)])
             ind = cast_type(ind, LONG, self.use_gpu)
             sequence_scores.index_fill_(0, ind, 0.0)
-
+            
+            # Added
+#             prob_outputs = torch.zeros(batch_size, self.max_dec_len, self.output_size, requires_grad=True)
+#             if self.use_gpu:
+#                 prob_outputs = prob_outputs.cuda()
+                
             for step in range(self.max_dec_len):
                 # one step for decoder 
                 # --- decoder_input: [b*k,1]  decoder_hidden_state: tuple([1,b*k,h], [1,b*k,h])
                 # --- decoder_output: [b*k,1,v]  step_logit: [b*k,1,v]
                 decoder_output, decoder_hidden_state, step_attn, step_logit = self.forward_step(decoder_input, decoder_hidden_state, attn_context, goal_hid=goal_hid)
+                
+#                 print("-------decoder_output_size: ", decoder_output.size())
 
                 # greedy search
                 if gen_type == "greedy":
@@ -277,7 +296,11 @@ class DecoderRNN(BaseRNN):
                         stored_predecessors, stored_symbols, stored_scores, batch_size, beam_size)
                 # only select top1 for beam search
                 symbol_outputs = predicts[:,0,:] # [b,len]
+                
+                # Adjusted
                 prob_outputs = 0 # dontcare logits for beam search generation
+#                 prob_outputs decoder_output
+                
                 logits = 0 # dontcare logits for beam search generation
             else:
                 raise NotImplementedError
@@ -285,6 +308,7 @@ class DecoderRNN(BaseRNN):
         # : store logits
         ret_dict['logits'] = logits
         ret_dict[DecoderRNN.KEY_SEQUENCE] = symbol_outputs
+        # print("------symbol_outputs_size: ", np.array(symbol_outputs).shape)
 
         # prob_outputs: (batch_size, max_dec_len, vocab_size)
         # decoder_hidden_state: tuple: (h, c)
@@ -389,8 +413,11 @@ class DecoderRNN(BaseRNN):
 
         # output: (batch_size, output_seq_len, dec_cell_size)
         # hidden: tuple: (h, c)
+        # print(hidden_state.size())
 
         # print ('This is the embedding size: ', embedded.size())
+        # print(hidden_state)
+        # print(hidden_state.size())
         output, hidden_s = self.rnn(embedded, hidden_state)
 
         # print ('This is the output size: ', output.size())

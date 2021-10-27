@@ -1,0 +1,230 @@
+Traceback (most recent call last):
+  File "train.py", line 5, in <module>
+    import torch
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/__init__.py", line 257, in <module>
+    from .functional import *
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/functional.py", line 2, in <module>
+    import torch.nn.functional as F
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/__init__.py", line 1, in <module>
+    from .modules import *
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/__init__.py", line 1, in <module>
+    from .module import Module
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 6, in <module>
+    from ..backends.thnn import backend as thnn_backend
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/backends/thnn.py", line 41, in <module>
+    _initialize_backend()
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/backends/thnn.py", line 22, in _initialize_backend
+    from .._functions.thnn import _all_functions as _thnn_functions
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/_functions/thnn/__init__.py", line 3, in <module>
+    from .auto import *
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/_functions/thnn/auto.py", line 5, in <module>
+    from torch._thnn.utils import parse_header, THNN_H_PATH
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/_thnn/__init__.py", line 52, in <module>
+    _thnn_headers = parse_header(THNN_H_PATH)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/_thnn/utils.py", line 112, in parse_header
+    t, name = l.split()
+KeyboardInterrupt
+[!] cannot find the module "torch_geometric", ignore it
+===========================================
+batch_size          : 32
+ckpt                : None
+concat_history      : False
+dataroot            : ./data/v1.0/
+dense_annotations   : visdial_1.0_val_dense_annotations.json
+dialog_train        : visdial_1.0_train.json
+dialog_val          : visdial_1.0_val.json
+dropout             : 0.5
+e_step              : 1
+embed_size          : 300
+gpuid               : 0
+img_feat_size       : 2048
+img_norm            : 1
+img_train           : features_faster_rcnn_x101_train.h5
+img_val             : features_faster_rcnn_x101_val.h5
+in_memory           : False
+isTrain             : True
+log_step            : 100
+lr                  : 0.0005
+lr_decay_rate       : 0.9997592083
+m_step              : 3
+message_size        : 512
+min_lr              : 5e-05
+num_epochs          : 45
+num_layers          : 2
+num_train           : None
+num_val             : None
+record_path         : ./tblog/prediction_{}.txt
+rnn_hidden_size     : 512
+save_path           : outputs/2021-10-27_23-14-02
+teach_force         : 0.5
+use_cuda            : True
+version             : 1.0
+visdial_data        : visdial_data_trainval.h5
+visdial_params      : visdial_params_trainval.json
+vocab_path          : ./data/v1.0/vocab.json
+===========================================
+
+
+Processing split [train]...
+Dataloader loading json file: ./data/v1.0/visdial_params_trainval.json
+Vocab size with <START>, <END>: 10528
+Dataloader loading h5 file: ./data/v1.0/visdial_data_trainval.h5
+[train] no. of data points: 11118
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+
+Processing split [val]...
+Dataloader loading json file: ./data/v1.0/visdial_params_trainval.json
+Vocab size with <START>, <END>: 10528
+Dataloader loading h5 file: ./data/v1.0/visdial_data_trainval.h5
+[val] no. of data points: 1000
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+Traceback (most recent call last):
+  File "train.py", line 75, in <module>
+    trainer.train(encoder, decoder)
+  File "/storage/cyhuang/visdial-gnn/vdgnn/trainer.py", line 71, in train
+    encoder = encoder.cuda()
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 258, in cuda
+    return self._apply(lambda t: t.cuda(device))
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 185, in _apply
+    module._apply(fn)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 191, in _apply
+    param.data = fn(param.data)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 258, in <lambda>
+    return self._apply(lambda t: t.cuda(device))
+KeyboardInterrupt
+[!] cannot find the module "torch_geometric", ignore it
+===========================================
+batch_size          : 32
+ckpt                : None
+concat_history      : False
+dataroot            : ./data/v1.0/
+dense_annotations   : visdial_1.0_val_dense_annotations.json
+dialog_train        : visdial_1.0_train.json
+dialog_val          : visdial_1.0_val.json
+dropout             : 0.5
+e_step              : 1
+embed_size          : 300
+gpuid               : 0
+img_feat_size       : 2048
+img_norm            : 1
+img_train           : features_faster_rcnn_x101_train.h5
+img_val             : features_faster_rcnn_x101_val.h5
+in_memory           : False
+isTrain             : True
+log_step            : 100
+lr                  : 0.0005
+lr_decay_rate       : 0.9997592083
+m_step              : 3
+message_size        : 512
+min_lr              : 5e-05
+num_epochs          : 45
+num_layers          : 2
+num_train           : None
+num_val             : None
+record_path         : ./tblog/prediction_{}.txt
+rnn_hidden_size     : 512
+save_path           : outputs/2021-10-27_23-32-26
+teach_force         : 0.5
+use_cuda            : True
+version             : 1.0
+visdial_data        : visdial_data_trainval.h5
+visdial_params      : visdial_params_trainval.json
+vocab_path          : ./data/v1.0/vocab.json
+===========================================
+
+
+Processing split [train]...
+Dataloader loading json file: ./data/v1.0/visdial_params_trainval.json
+Vocab size with <START>, <END>: 10528
+Traceback (most recent call last):
+  File "train.py", line 31, in <module>
+    dataset = VisDialDataset(opts, 'train', isTrain=True)
+  File "/storage/cyhuang/visdial-gnn/vdgnn/dataset/dataloader.py", line 105, in __init__
+    json.dump(self.ind2word, open(args.vocab_path, "w"))
+KeyboardInterrupt
+/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/rnn.py:38: UserWarning: dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1, but got dropout=0.5 and num_layers=1
+  "num_layers={}".format(dropout, num_layers))
+[!] cannot find the module "torch_geometric", ignore it
+===========================================
+batch_size          : 32
+ckpt                : None
+concat_history      : False
+dataroot            : ./data/v1.0/
+dense_annotations   : visdial_1.0_val_dense_annotations.json
+dialog_train        : visdial_1.0_train.json
+dialog_val          : visdial_1.0_val.json
+dropout             : 0.5
+e_step              : 1
+embed_size          : 300
+gpuid               : 0
+img_feat_size       : 2048
+img_norm            : 1
+img_train           : features_faster_rcnn_x101_train.h5
+img_val             : features_faster_rcnn_x101_val.h5
+in_memory           : False
+isTrain             : True
+log_step            : 100
+lr                  : 0.0005
+lr_decay_rate       : 0.9997592083
+m_step              : 3
+message_size        : 512
+min_lr              : 5e-05
+num_epochs          : 45
+num_layers          : 2
+num_train           : None
+num_val             : None
+record_path         : ./tblog/prediction_{}.txt
+rnn_hidden_size     : 512
+save_path           : outputs/2021-10-27_23-58-04
+teach_force         : 0.5
+use_cuda            : True
+version             : 1.0
+visdial_data        : visdial_data_trainval.h5
+visdial_params      : visdial_params_trainval.json
+vocab_path          : ./data/v1.0/vocab.json
+===========================================
+
+
+Processing split [train]...
+Dataloader loading json file: ./data/v1.0/visdial_params_trainval.json
+Vocab size with <START>, <END>: 10528
+Dataloader loading h5 file: ./data/v1.0/visdial_data_trainval.h5
+[train] no. of data points: 11118
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+
+Processing split [val]...
+Dataloader loading json file: ./data/v1.0/visdial_params_trainval.json
+Vocab size with <START>, <END>: 10528
+Dataloader loading h5 file: ./data/v1.0/visdial_data_trainval.h5
+[val] no. of data points: 1000
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+[Epoch:   1][Iter:      1] Starts
+torch.Size([32, 512])
+Traceback (most recent call last):
+  File "train.py", line 75, in <module>
+    trainer.train(encoder, decoder)
+  File "/storage/cyhuang/visdial-gnn/vdgnn/trainer.py", line 138, in train
+    beam_size=3)  # (batch_size, goal_nhid)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 477, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/storage/cyhuang/visdial-gnn/vdgnn/models/decoder_rnn_hdno.py", line 188, in forward
+    prob_outputs, decoder_hidden_state, attn, logits = self.forward_step(input_var=decoder_input, hidden_state=decoder_hidden_state, encoder_outputs=attn_context, goal_hid=goal_hid)
+  File "/storage/cyhuang/visdial-gnn/vdgnn/models/decoder_rnn_hdno.py", line 401, in forward_step
+    output, hidden_s = self.rnn(embedded, hidden_state)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/module.py", line 477, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/rnn.py", line 178, in forward
+    self.check_forward_args(input, hx, batch_sizes)
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/rnn.py", line 147, in check_forward_args
+    'Expected hidden[0] size {}, got {}')
+  File "/storage/cyhuang/anaconda3/lib/python3.7/site-packages/torch/nn/modules/rnn.py", line 143, in check_hidden_size
+    raise RuntimeError(msg.format(expected_hidden_size, tuple(hx.size())))
+RuntimeError: Expected hidden[0] size (1, 32, 512), got (512,)

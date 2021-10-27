@@ -114,30 +114,30 @@ def idx2word(vocab, data, b_id, stop_eos=True, stop_pad=True):
     return de_tknize(ws)
 
 # Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
-class TBLogger(object):
-    def __init__(self, log_dir):
-        """Create a summary writer logging to log_dir."""
-        self.prepare_dir(log_dir) # clean previous tensorboard file first
-        self.writer = SummaryWriter(log_dir)
+# class TBLogger(object):
+#     def __init__(self, log_dir):
+#         """Create a summary writer logging to log_dir."""
+#         self.prepare_dir(log_dir) # clean previous tensorboard file first
+#         self.writer = SummaryWriter(log_dir)
 
-    def prepare_dir(self, path):
-        if os.path.exists(path):
-            for f in os.listdir(path):
-                file_path = os.path.join(path,f)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-        else:
-            os.makedirs(path)
+#     def prepare_dir(self, path):
+#         if os.path.exists(path):
+#             for f in os.listdir(path):
+#                 file_path = os.path.join(path,f)
+#                 if os.path.isfile(file_path):
+#                     os.remove(file_path)
+#         else:
+#             os.makedirs(path)
 
-    def scalar_summary(self, tag, value, step):
-        """Log a scalar variable."""
-        self.writer.add_scalar(tag, value, global_step=step)
+#     def scalar_summary(self, tag, value, step):
+#         """Log a scalar variable."""
+#         self.writer.add_scalar(tag, value, global_step=step)
 
-    def add_scalar_summary(self, data_dict, step):
-       for key,value in data_dict.items():
-            self.scalar_summary(key, value, step)
+#     def add_scalar_summary(self, data_dict, step):
+#        for key,value in data_dict.items():
+#             self.scalar_summary(key, value, step)
 
 
 

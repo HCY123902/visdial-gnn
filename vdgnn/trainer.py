@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
+from torch.nn.utils import clip_grad_norm_
 import gc
 import os
 import math
@@ -9,6 +10,7 @@ import time
 import json
 from tqdm import tqdm
 from vdgnn.models.decoder_rnn import Decoder_RNN
+from vdgnn.models.decoder_rnn_hdno import DecoderRNN
 from vdgnn.utils.eval_utils import *
 from vdgnn.utils.metrics import NDCG
 # from torch.utils.tensorboard import SummaryWriter
@@ -30,11 +32,12 @@ class Trainer(object):
         self.dataloader = dataloader
         self.dataloader_val = dataloader_val
 
-        self.model_dir = os.path.join(self.output_dir, 'checkpoints')
+        self.model_dir = os.path.join(self.output_dir)
         self.record_path = model_args.record_path
         self.vocab_path = model_args.vocab_path
 #         self.writer = SummaryWriter(log_dir='../log/dailydialog/')
         self.teach_force = model_args.teach_force
+        self.grad_clip = model_args.grad_clip
     
         vocab = open(self.vocab_path, "r")
         ind2word = json.load(vocab)
@@ -92,7 +95,7 @@ class Trainer(object):
                 # enc_output = torch.zedros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
                 # Adjusted
                 ans_len = batch['ans'].size(2)
-                dec_output = torch.zeros(batch_size, max_num_rounds, ans_len, decoder.output_size, requires_grad=True)
+                dec_output = torch.zeros(batch_size, max_num_rounds, ans_len - 1, decoder.output_size, requires_grad=True)
 
                 if self.use_cuda:
                     #enc_output = enc_output.cuda()
@@ -118,22 +121,41 @@ class Trainer(object):
                     # enc_output[:, rnd, :] = enc_out
 
                     # [2, batch_size, hidden_size]
-                    initial_hidden = torch.stack([enc_out, enc_out], 0)
+#                     initial_hidden = torch.stack([enc_out, enc_out], 0)
+                    # initial_hidden = enc_out
+                    initial_hidden = enc_out.squeeze(0).repeat(2, 1, 1)
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
                     # ans_len = batch['ans'].size(2)
                     
-                    use_teacher = random.random() < self.teach_force
+                    # use_teacher = random.random() < self.teach_force
+                    use_teacher = random.random() < 1.1
                     if use_teacher:
-                        out = decoder(ans_tokens, initial_hidden, context_out)
+                        # out = decoder(ans_tokens, initial_hidden, context_out)
+                        dec_outputs, dec_hidden_state, ret_dict = decoder(batch_size=batch_size,
+                                                                        dec_inputs=ans_tokens,
+                                                                        dec_init_state=initial_hidden,
+                                                                        attn_context=context_out,
+                                                                        mode='teacher_forcing',
+                                                                        gen_type='beam',
+                                                                        beam_size=3)  # (batch_size, goal_nhid)
                     else:
 #                         start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
 #                         if self.use_cuda:
 #                             start_tokens = start_tokens.cuda()
-                        out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
+                        # out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
+                        dec_outputs, dec_hidden_state, ret_dict = decoder(batch_size=batch_size,
+                                                                        dec_inputs=ans_tokens,
+                                                                        dec_init_state=initial_hidden,
+                                                                        attn_context=context_out,
+                                                                        mode='gen',
+                                                                        gen_type='beam',
+                                                                        beam_size=3)  # (batch_size, goal_nhid)
+                        # print("-------dec_outputs: ", dec_outputs)
+                    
 
-                    dec_output[:, rnd, :, :] = out
+                    dec_output[:, rnd, :, :] = dec_outputs[:, :-1, :]
 
                 # dec_out = decoder(enc_output.contiguous().view(-1, self.args.message_size), batch)
                 
@@ -142,9 +164,12 @@ class Trainer(object):
                 # print("ans_ind size: {}".format(ans_ind.size()))
 
                 # cur_loss = criterion(dec_out, ans_ind.view(-1))
-                cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'].view(-1))
+                cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'][:, :, 1:].contiguous().view(-1))
                 
                 cur_loss.backward()
+                
+                # Added
+                clip_grad_norm_(decoder.parameters(), self.grad_clip)
 
                 optimizer.step()
                 gc.collect()
@@ -164,11 +189,11 @@ class Trainer(object):
                     print("[Epoch: {:3d}][Iter: {:6d}][Loss: {:6f}][lr: {:6f}][Duration: {:6.2f}s]".format(
                         epoch, iter+1, running_loss, optimizer.param_groups[0]['lr'], time.time() - iter_time))
                     iter_time = time.time()
-                    ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
+#                     ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
-                    self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
-                    encoder.train()
-                    decoder.train()
+#                     self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
+#                     encoder.train()
+#                     decoder.train()
 
             print("[Epoch: {:3d}][Loss: {:6f}][lr: {:6f}][Time: {:6.2f}s]".format(
                         epoch, running_loss, optimizer.param_groups[0]['lr'], time.time() - epoch_time))
@@ -182,12 +207,12 @@ class Trainer(object):
                 if not os.path.exists(self.model_dir):
                     os.makedirs(self.model_dir)
 
-#                 torch.save({
-#                     'encoder':encoder.state_dict(),
-#                     'decoder':decoder.state_dict(),
-#                     'optimizer': optimizer.state_dict(),
-#                     'model_args': self.args
-#                 }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
+                torch.save({
+                    'encoder':encoder.state_dict(),
+                    'decoder':decoder.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    #'model_args': self.args
+                }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
 
                 ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
@@ -197,7 +222,7 @@ class Trainer(object):
             'encoder':encoder.state_dict(),
             'decoder':decoder.state_dict(),
             'optimizer': optimizer.state_dict(),
-            'model_args': self.args
+            #'model_args': self.args
         }, os.path.join(self.model_dir, 'model_epoch_final.pth'))
 
 
@@ -232,7 +257,7 @@ class Trainer(object):
 
             # enc_output = torch.zeros(batch_size, max_num_rounds, self.args.message_size, requires_grad=True)
             ans_len = batch['ans'].size(2)
-            dec_output = torch.zeros(batch_size, max_num_rounds, ans_len, decoder.output_size, requires_grad=True)
+            dec_output = torch.zeros(batch_size, max_num_rounds, ans_len - 1, decoder.output_size, requires_grad=True)
 
             if self.use_cuda:
                 # enc_output = enc_output.cuda()
@@ -258,42 +283,53 @@ class Trainer(object):
                     #enc_output[:, rnd, :] = enc_out
                     
                     # [2, batch_size, hidden_size]
-                    initial_hidden = torch.stack([enc_out, enc_out], 0)
+#                     initial_hidden = torch.stack([enc_out, enc_out], 0)
+                    # initial_hidden = enc_out
+                    initial_hidden = enc_out.squeeze(0).repeat(2, 1, 1)
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
                     # ans_len = batch['ans'].size(2)
                     
-#                     start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
-#                     if self.use_cuda:
-#                             start_tokens = start_tokens.cuda()
+                    start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
+                    if self.use_cuda:
+                            start_tokens = start_tokens.cuda()
 
-                    out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
+#                     out = decoder(ans_tokens[:, 0], initial_hidden, context_out, ans_len=ans_tokens.size(1), is_train=False)
+
+                    dec_outputs, dec_hidden_state, ret_dict = decoder(batch_size=batch_size,
+                                                                        dec_inputs=start_tokens.unsqueeze(1),
+                                                                        dec_init_state=initial_hidden,
+                                                                        attn_context=context_out,
+                                                                        mode='gen',
+                                                                        gen_type='beam',
+                                                                        beam_size=3)
+#                     print(dec_outputs)
                     
-                    dec_output[:, rnd, :, :] = out
+                    # dec_output[:, rnd, :, :] = dec_outputs[:, :-1, :]
                     
-                    self.translate(round_info['hist'], round_info['ques'], out, ans_tokens, prediction_records)
+                    self.translate(round_info['hist'], round_info['ques'], ret_dict, ans_tokens, prediction_records)
                     
 
                     
-                cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'].view(-1))
+                # cur_loss = criterion(dec_output.view(-1, decoder.output_size), batch['ans'][:,:,1:].contiguous().view(-1))
                 batch_number = batch_number + 1
                 #total_e = total_e + int(cur_loss.data)
                 
-                if total_e is not None:
-                    total_e = total_e + cur_loss.data
-                else:
-                    total_e = cur_loss.data
+#                 if total_e is not None:
+#                     total_e = total_e + cur_loss.data
+#                 else:
+#                     total_e = cur_loss.data
         
         
         prediction_records.close()
         
-        l = round(total_e.item() / batch_number, 4)
-        ppl = math.exp(l)
+#         l = round(total_e.item() / batch_number, 4)
+#         ppl = math.exp(l)
 
         gc.collect()
 
-        return ppl
+        return 1
 
     def translate(self, source, question, prediction, reference, record):
         
@@ -303,11 +339,20 @@ class Trainer(object):
         
         end_token = len(ind2word)
         
-        batch_size, ans_len = prediction.size()[:2]
+#         print(prediction)
+#         print(prediction)
+#         print(prediction)
+#         print(prediction)
+#         print(prediction)
+#         print(prediction)
+        # batch_size, ans_len = prediction.size()[:2]
+        batch_size = len(prediction)
         _, rounds, hist_len = source.size()
         
         # [batch_size, ans_len]
-        tokens = prediction.max(2)[1]
+        # tokens = prediction.max(2)[1]
+        tokens = prediction['sequence']
+        # print(tokens)
         
         for i in range(batch_size):
             src_list = []
@@ -330,7 +375,8 @@ class Trainer(object):
             ques.replace('<START>', '').strip()
             ques.replace('<END>', '').strip()
             
-            pred = list(map(int, tokens[i, :].tolist()))
+            # pred = list(map(int, tokens[i, :].tolist()))
+            pred = list(map(int, tokens[i]))
             end_index = pred.index(0) if 0 in pred else len(pred)
             end_index_ = pred.index(end_token) if end_token in pred else len(pred)
             #end_index = min(end_index, end_index_)

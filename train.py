@@ -1,10 +1,15 @@
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
 import torch
 import argparse
 import time
-import os
+
 from vdgnn.dataset.dataloader import VisDialDataset
 from torch.utils.data import DataLoader
 from vdgnn.models.decoder_rnn import Decoder_RNN
+from vdgnn.models.decoder_rnn_hdno import DecoderRNN
 from vdgnn.models.encoder import GCNNEncoder
 from vdgnn.models.decoder import DiscriminativeDecoder
 from vdgnn.options.train_options import TrainOptions
@@ -47,7 +52,23 @@ if __name__ == '__main__':
     encoder = GCNNEncoder(model_args)
 
     # decoder = DiscriminativeDecoder(model_args, encoder)
-    decoder = Decoder_RNN(model_args, encoder)
+    # decoder = Decoder_RNN(model_args, encoder)
+    decoder = DecoderRNN(input_dropout_p=model_args.decoder_dropout,
+                                  rnn_cell='lstm',
+                                  input_size=model_args.embed_size,
+                                  hidden_size=model_args.rnn_hidden_size,
+                                  num_layers=2,
+                                  output_dropout_p=model_args.decoder_dropout,
+                                  bidirectional=False,
+                                  vocab_size=model_args.vocab_size,
+                                  use_attn=True,
+                                  ctx_cell_size=model_args.rnn_hidden_size,
+                                  attn_mode='cat',
+                                  sys_id=model_args.vocab_size - 2,
+                                  eos_id=model_args.vocab_size - 1,
+                                  use_gpu=True,
+                                  max_dec_len=20,
+                                  embedding=None)
 
     trainer = Trainer(dataloader, dataloader_val, model_args)
 
