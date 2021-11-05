@@ -168,7 +168,10 @@ class DecoderRNN(BaseRNN):
     
 #             print("--------decoder_hidden_state_size: ", dd.size())
         
-            decoder_hidden_state = (dd, dd.clone())
+            if self.use_gpu:
+                decoder_hidden_state = (dd.cuda(), dd.clone().cuda())
+            else:
+                decoder_hidden_state = (dd, dd.clone())
             
             # decoder_hidden_state = tuple(decoder_hidden_state)
             # decoder_hidden_state = th.stack(decoder_hidden_state, 0)
@@ -178,7 +181,10 @@ class DecoderRNN(BaseRNN):
 
         else:
             # : dec_init_state is the embedding of selected z, with size (b, d)
-            decoder_hidden_state = dec_init_state
+            if self.use_gpu:
+                decoder_hidden_state = (dec_init_state, dec_init_state.clone().cuda())
+            else:
+                decoder_hidden_state = (dec_init_state, dec_init_state.clone())
 
         ##### Decode #####
         symbol_outputs, logits = [], []
@@ -190,7 +196,7 @@ class DecoderRNN(BaseRNN):
             #           attn_context = the full map of embedding of all possible z, with size (b, m, d)
             #           goal = None
             # print(decoder_hidden_state.size())
-            decoder_hidden_state = (decoder_hidden_state, decoder_hidden_state.clone())
+            # decoder_hidden_state = (decoder_hidden_state, decoder_hidden_state.clone())
             prob_outputs, decoder_hidden_state, attn, logits = self.forward_step(input_var=decoder_input, hidden_state=decoder_hidden_state, encoder_outputs=attn_context, goal_hid=goal_hid)
 
 

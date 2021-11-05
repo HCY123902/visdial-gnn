@@ -50,8 +50,8 @@ class Trainer(object):
 
         #criterion = nn.CrossEntropyLoss()
         # Adjusted
-#        criterion = nn.NLLLoss(ignore_index=0)
-        criterion = nn.NLLLoss()
+        criterion = nn.NLLLoss(ignore_index=0)
+#         criterion = nn.NLLLoss()
 
         running_loss = None
 
@@ -139,7 +139,7 @@ class Trainer(object):
                                                                         attn_context=context_out,
                                                                         mode='teacher_forcing',
                                                                         gen_type='beam',
-                                                                        beam_size=3)  # (batch_size, goal_nhid)
+                                                                        beam_size=10)  # (batch_size, goal_nhid)
                     else:
 #                         start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
 #                         if self.use_cuda:
@@ -151,7 +151,7 @@ class Trainer(object):
                                                                         attn_context=context_out,
                                                                         mode='gen',
                                                                         gen_type='beam',
-                                                                        beam_size=3)  # (batch_size, goal_nhid)
+                                                                        beam_size=10)  # (batch_size, goal_nhid)
                         # print("-------dec_outputs: ", dec_outputs)
                     
 
@@ -199,11 +199,14 @@ class Trainer(object):
                         epoch, running_loss, optimizer.param_groups[0]['lr'], time.time() - epoch_time))
             # self.writer.add_scalar('{}-Loss/train'.format(title), running_loss, epoch)
             # self.writer.add_scalar('{}-lr/train'.format(title), optimizer.param_groups[0]['lr'], epoch)
+            
+            ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
+            self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
 
             # --------------------------------------------------------------------
             # Save checkpoints
             # --------------------------------------------------------------------
-            if epoch % 1 == 0:
+            if epoch % 10 == 0:
                 if not os.path.exists(self.model_dir):
                     os.makedirs(self.model_dir)
 
@@ -214,9 +217,9 @@ class Trainer(object):
                     #'model_args': self.args
                 }, os.path.join(self.model_dir, 'model_epoch_{:06d}.pth'.format(epoch)))
 
-                ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
+#                 ppl = self.validate(encoder, decoder, record_path.format(epoch), epoch)
 #                 evaluate_prediction_result(record_path, self.writer, epoch, ppl)
-                self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
+#                 self.evaluate_prediction_result(record_path.format(epoch), epoch, ppl)
 
         torch.save({
             'encoder':encoder.state_dict(),
@@ -237,8 +240,8 @@ class Trainer(object):
         total_e = None
         batch_number = 0
         
-#         criterion = nn.NLLLoss(ignore_index=0)
-        criterion = nn.NLLLoss()
+        criterion = nn.NLLLoss(ignore_index=0)
+#         criterion = nn.NLLLoss()
     
         
         
@@ -246,7 +249,7 @@ class Trainer(object):
 
         
 
-        for i, batch in enumerate(tqdm(self.dataloader)):
+        for i, batch in enumerate(tqdm(self.dataloader_val)):
 
             for key in batch:
                 if not isinstance(batch[key], list):
@@ -286,6 +289,9 @@ class Trainer(object):
 #                     initial_hidden = torch.stack([enc_out, enc_out], 0)
                     # initial_hidden = enc_out
                     initial_hidden = enc_out.squeeze(0).repeat(2, 1, 1)
+                    if self.use_cuda:
+                        context_out = context_out.cuda()
+                        initial_hidden = initial_hidden.cuda()
 
                     # [batch_size, ans_len]
                     ans_tokens = batch['ans'][:, rnd, :]
@@ -303,7 +309,7 @@ class Trainer(object):
                                                                         attn_context=context_out,
                                                                         mode='gen',
                                                                         gen_type='beam',
-                                                                        beam_size=3)
+                                                                        beam_size=10)
 #                     print(dec_outputs)
                     
                     # dec_output[:, rnd, :, :] = dec_outputs[:, :-1, :]
@@ -346,12 +352,13 @@ class Trainer(object):
 #         print(prediction)
 #         print(prediction)
         # batch_size, ans_len = prediction.size()[:2]
-        batch_size = len(prediction)
+        #batch_size = len(prediction)
         _, rounds, hist_len = source.size()
         
         # [batch_size, ans_len]
         # tokens = prediction.max(2)[1]
         tokens = prediction['sequence']
+        batch_size = len(tokens)
         # print(tokens)
         
         for i in range(batch_size):

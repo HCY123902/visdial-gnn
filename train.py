@@ -3,6 +3,8 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import torch
+torch.set_num_threads(10)
+
 import argparse
 import time
 
