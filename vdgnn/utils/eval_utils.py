@@ -1,10 +1,14 @@
 import torch
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from nltk.translate.bleu_score import SmoothingFunction
+from nltk.collocations import BigramCollocationFinder
+from nltk.probability import FreqDist
 import argparse
+import codecs
 import math
 from rouge import Rouge
 import numpy as np
+import os, re
 
 def cal_aggregate_BLEU_nltk(refs, tgts):
     #print(refs)
@@ -42,10 +46,16 @@ def cal_Distinct(corpus):
         bi_diversity: distinct-2 score
     """
     bigram_finder = BigramCollocationFinder.from_words(corpus)
-    bi_diversity = len(bigram_finder.ngram_fd) / bigram_finder.N
+    if bigram_finder.N == 0:
+        bi_diversity = 0.9
+    else:
+        bi_diversity = float(len(bigram_finder.ngram_fd)) / float(bigram_finder.N)
 
     dist = FreqDist(corpus)
-    uni_diversity = len(dist) / len(corpus)
+    if len(corpus) == 0:
+        uni_diversity = 0.5
+    else:
+        uni_diversity = float(len(dist)) / float(len(corpus))
 
     return uni_diversity, bi_diversity
 
@@ -76,7 +86,11 @@ def cal_vector_extrema(x, y, dic):
         vectors = []
         for w in p:
             if w in dic:
-                vectors.append(dic[w.lower()])
+                # Adjusted
+                if w.lower() in dic:
+                    vectors.append(dic[w.lower()])
+                else:
+                    vectors.append(dic[w])
         if not vectors:
             vectors.append(np.random.randn(300))
         return np.stack(vectors)
@@ -99,7 +113,11 @@ def cal_embedding_average(x, y, dic):
         vectors = []
         for w in p:
             if w in dic:
-                vectors.append(dic[w.lower()])
+                # Adjusted
+                if w.lower() in dic:
+                    vectors.append(dic[w.lower()])
+                else:
+                    vectors.append(dic[w])
         if not vectors:
             vectors.append(np.random.randn(300))
         return np.stack(vectors)
@@ -143,7 +161,11 @@ def cal_greedy_matching(x, y, dic):
         vectors = []
         for w in p:
             if w in dic:
-                vectors.append(dic[w.lower()])
+                # Adjusted
+                if w.lower() in dic:
+                    vectors.append(dic[w.lower()])
+                else:
+                    vectors.append(dic[w])
         if not vectors:
             vectors.append(np.random.randn(300))
         return np.stack(vectors)
@@ -214,7 +236,11 @@ def cal_greedy_matching_matrix(x, y, dic):
         vectors = []
         for w in p:
             if w in dic:
-                vectors.append(dic[w.lower()])
+                # Adjusted
+                if w.lower() in dic:
+                    vectors.append(dic[w.lower()])
+                else:
+                    vectors.append(dic[w])
         if not vectors:
             vectors.append(np.random.randn(300))
         return np.stack(vectors)

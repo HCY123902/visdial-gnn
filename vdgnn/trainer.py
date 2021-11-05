@@ -486,10 +486,10 @@ class Trainer(object):
             ref, tgt = [], []
             for idx, line in enumerate(f.readlines()):
                 # line = line.lower()
-                if idx % 4 == 1:
+                if idx % 5 == 2:
                     line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
                     ref.append(line.split())
-                elif idx % 4 == 2:
+                elif idx % 5 == 3:
                     line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
                     tgt.append(line.split())
 

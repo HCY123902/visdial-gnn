@@ -12,17 +12,17 @@ from tqdm import tqdm
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the model")
     parser.add_argument('--model', type=str, default='VisDial', help='model name')
-    parser.add_argument('--file', type=str, default=None, help='result file')
+    parser.add_argument('--path', type=str, default=None, help='result file')
     args = parser.parse_args()
 
-    with open(args.file) as f:
+    with open(args.path) as f:
         ref, tgt = [], []
         for idx, line in enumerate(f.readlines()):
             # line = line.lower()
-            if idx % 4 == 1:
+            if idx % 5 == 2:
                 line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
                 ref.append(line.split())
-            elif idx % 4 == 2:
+            elif idx % 5 == 3:
                 line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
                 tgt.append(line.split())
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # BERTScore < 512 for bert
     # Fuck BERTScore, slow as the snail, fuck it
-    bert_scores = cal_BERTScore(refs, tgts)
+#     bert_scores = cal_BERTScore(refs, tgts)
     
     # Embedding-based metric: Embedding Average (EA), Vector Extrema (VX), Greedy Matching (GM)
     # load the dict
@@ -90,4 +90,4 @@ if __name__ == "__main__":
     print(f'EA: {round(ea_sum / counterp, 4)}')
     print(f'VX: {round(vx_sum / counterp, 4)}')
     print(f'GM: {round(gm_sum / counterp, 4)}')
-    print(f'BERTScore: {round(bert_scores, 4)}')
+#     print(f'BERTScore: {round(bert_scores, 4)}')
