@@ -50,8 +50,8 @@ class Trainer(object):
 
         #criterion = nn.CrossEntropyLoss()
         # Adjusted
-        criterion = nn.NLLLoss(ignore_index=0)
-#         criterion = nn.NLLLoss()
+#         criterion = nn.NLLLoss(ignore_index=0)
+        criterion = nn.NLLLoss()
 
         running_loss = None
 
@@ -138,8 +138,8 @@ class Trainer(object):
                                                                         dec_init_state=initial_hidden,
                                                                         attn_context=context_out,
                                                                         mode='teacher_forcing',
-                                                                        gen_type='beam',
-                                                                        beam_size=10)  # (batch_size, goal_nhid)
+                                                                        gen_type='sample',
+                                                                        beam_size=5)  # (batch_size, goal_nhid)
                     else:
 #                         start_tokens = torch.zeros(batch_size, dtype=torch.long).fill_(self.sos)
 #                         if self.use_cuda:
@@ -150,8 +150,8 @@ class Trainer(object):
                                                                         dec_init_state=initial_hidden,
                                                                         attn_context=context_out,
                                                                         mode='gen',
-                                                                        gen_type='beam',
-                                                                        beam_size=10)  # (batch_size, goal_nhid)
+                                                                        gen_type='sample',
+                                                                        beam_size=5)  # (batch_size, goal_nhid)
                         # print("-------dec_outputs: ", dec_outputs)
                     
 
@@ -240,8 +240,8 @@ class Trainer(object):
         total_e = None
         batch_number = 0
         
-        criterion = nn.NLLLoss(ignore_index=0)
-#         criterion = nn.NLLLoss()
+#         criterion = nn.NLLLoss(ignore_index=0)
+        criterion = nn.NLLLoss()
     
         
         
@@ -308,8 +308,8 @@ class Trainer(object):
                                                                         dec_init_state=initial_hidden,
                                                                         attn_context=context_out,
                                                                         mode='gen',
-                                                                        gen_type='beam',
-                                                                        beam_size=10)
+                                                                        gen_type='sample',
+                                                                        beam_size=5)
 #                     print(dec_outputs)
                     
                     # dec_output[:, rnd, :, :] = dec_outputs[:, :-1, :]
@@ -482,7 +482,7 @@ class Trainer(object):
 # #         write now
 # #         writer.flush()
 
-        with open(args.file) as f:
+        with open(pred_path) as f:
             ref, tgt = [], []
             for idx, line in enumerate(f.readlines()):
                 # line = line.lower()
@@ -523,7 +523,7 @@ class Trainer(object):
 
         # BERTScore < 512 for bert
         # Fuck BERTScore, slow as the snail, fuck it
-        bert_scores = cal_BERTScore(refs, tgts)
+        # bert_scores = cal_BERTScore(refs, tgts)
 
         # Embedding-based metric: Embedding Average (EA), Vector Extrema (VX), Greedy Matching (GM)
         # load the dict
@@ -557,7 +557,7 @@ class Trainer(object):
         print(f'EA: {round(ea_sum / counterp, 4)}')
         print(f'VX: {round(vx_sum / counterp, 4)}')
         print(f'GM: {round(gm_sum / counterp, 4)}')
-        print(f'BERTScore: {round(bert_scores, 4)}')
+        # print(f'BERTScore: {round(bert_scores, 4)}')
 
         
         
