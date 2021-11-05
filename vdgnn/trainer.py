@@ -414,73 +414,151 @@ class Trainer(object):
     def evaluate_prediction_result(self, pred_path, epoch, ppl):
         # obtain the performance
         # print('[!] measure the performance and write into tensorboard')
-        with open(pred_path) as f:
+#         with open(pred_path) as f:
+#             ref, tgt = [], []
+#             for idx, line in enumerate(f.readlines()):
+#                 line = line.lower()    # lower the case
+#                 if idx % 5 == 2:
+#                     line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+#                     # print(line)
+#                     ref.append(line.split())
+#                 elif idx % 5 == 3:
+#                     line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
+#                     # print(line)
+#                     tgt.append(line.split())
+
+#         assert len(ref) == len(tgt)
+
+#         # ROUGE
+#         rouge_sum, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, counter = 0, 0, 0, 0, 0, 0
+#         for rr, cc in tqdm(list(zip(ref, tgt))):
+#             rouge_sum += cal_ROUGE(rr, cc)
+#             # rouge_sum += 0.01
+#             counter += 1
+
+#         # BlEU
+#         refs, tgts = [' '.join(i) for i in ref], [' '.join(i) for i in tgt]
+#         bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum = cal_aggregate_BLEU_nltk(refs, tgts)
+
+# #         # Distinct-1, Distinct-2
+# #         candidates, references = [], []
+# #         for line1, line2 in zip(tgt, ref):
+# #             candidates.extend(line1)
+# #             references.extend(line2)
+# #         distinct_1, distinct_2 = cal_Distinct(candidates)
+# #         rdistinct_1, rdistinct_2 = cal_Distinct(references)
+
+#         # Embedding-based metric: Embedding Average (EA), Vector Extrema (VX), Greedy Matching (GM)
+#         # load the dict
+#         # with open('./data/glove_embedding.pkl', 'rb') as f:
+#         #     dic = pickle.load(f)
+# #         dic = gensim.models.KeyedVectors.load_word2vec_format('./data/GoogleNews-vectors-negative300.bin', binary=True)
+# #         print('[!] load the GoogleNews 300 word2vector by gensim over')
+# #         ea_sum, vx_sum, gm_sum, counterp = 0, 0, 0, 0
+# #         for rr, cc in tqdm(list(zip(ref, tgt))):
+# #             ea_sum += cal_embedding_average(rr, cc, dic)
+# #             vx_sum += cal_vector_extrema(rr, cc, dic)
+# #             gm_sum += cal_greedy_matching_matrix(rr, cc, dic)
+# #             counterp += 1
+
+#         # write into the tensorboard
+# #         writer.add_scalar('{}-Performance/PPL'.format(title), ppl, epoch)
+# #         writer.add_scalar('{}-Performance/BLEU-1'.format(title), bleu1_sum, epoch)
+# #         writer.add_scalar('{}-Performance/BLEU-2'.format(title), bleu2_sum, epoch)
+# #         writer.add_scalar('{}-Performance/BLEU-3'.format(title), bleu3_sum, epoch)
+# #         writer.add_scalar('{}-Performance/BLEU-4'.format(title), bleu4_sum, epoch)
+# #         writer.add_scalar('{}-Performance/ROUGE'.format(title), rouge_sum / counter, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Distinct-1', distinct_1, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Distinct-2', distinct_2, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-1', rdistinct_1, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-2', rdistinct_2, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Embedding-Average', ea_sum / counterp, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Vector-Extrema', vx_sum / counterp, epoch)
+# #         writer.add_scalar(f'{writer_str}-Performance/Greedy-Matching', gm_sum / counterp, epoch)
+
+#         print("[Epoch: {:3d}][BLEU-1: {:6f}][BLEU-2: {:6f}][BLEU-3: {:6f}][BLEU-4: {:6f}][ROUGE: {:6f}][PPL: {:6f}]".format(
+#                         epoch, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, rouge_sum / counter, ppl))
+
+# #         write now
+# #         writer.flush()
+
+        with open(args.file) as f:
             ref, tgt = [], []
             for idx, line in enumerate(f.readlines()):
-                line = line.lower()    # lower the case
-                if idx % 5 == 2:
+                # line = line.lower()
+                if idx % 4 == 1:
                     line = line.replace("user1", "").replace("user0", "").replace("- ref: ", "").replace('<sos>', '').replace('<eos>', '').strip()
-                    # print(line)
                     ref.append(line.split())
-                elif idx % 5 == 3:
+                elif idx % 4 == 2:
                     line = line.replace("user1", "").replace("user0", "").replace("- tgt: ", "").replace('<sos>', '').replace('<eos>', '').strip()
-                    # print(line)
                     tgt.append(line.split())
 
         assert len(ref) == len(tgt)
 
-        # ROUGE
+        # BLEU and ROUGE
         rouge_sum, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, counter = 0, 0, 0, 0, 0, 0
         for rr, cc in tqdm(list(zip(ref, tgt))):
             rouge_sum += cal_ROUGE(rr, cc)
-            # rouge_sum += 0.01
+            # bleu1_sum += cal_BLEU([rr], cc, ngram=1)
+            # bleu2_sum += cal_BLEU([rr], cc, ngram=2)
+            # bleu3_sum += cal_BLEU([rr], cc, ngram=3)
+            # bleu4_sum += cal_BLEU([rr], cc, ngram=4)
             counter += 1
 
-        # BlEU
         refs, tgts = [' '.join(i) for i in ref], [' '.join(i) for i in tgt]
+        #bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum = cal_BLEU(refs, tgts)
         bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum = cal_aggregate_BLEU_nltk(refs, tgts)
 
-#         # Distinct-1, Distinct-2
-#         candidates, references = [], []
-#         for line1, line2 in zip(tgt, ref):
-#             candidates.extend(line1)
-#             references.extend(line2)
-#         distinct_1, distinct_2 = cal_Distinct(candidates)
-#         rdistinct_1, rdistinct_2 = cal_Distinct(references)
+        # Intra Distinct-1, Distinct-2
+        intra_distinct_1, intra_distinct_2 = cal_intra_Distinct(tgt)
+        rintra_distinct_1, rintra_distinct_2 = cal_intra_Distinct(ref)
+
+        # Distinct-1, Distinct-2
+        candidates, references = [], []
+        for line1, line2 in zip(tgt, ref):
+            candidates.extend(line1)
+            references.extend(line2)
+        distinct_1, distinct_2 = cal_Distinct(candidates)
+        rdistinct_1, rdistinct_2 = cal_Distinct(references)
+
+        # BERTScore < 512 for bert
+        # Fuck BERTScore, slow as the snail, fuck it
+        bert_scores = cal_BERTScore(refs, tgts)
 
         # Embedding-based metric: Embedding Average (EA), Vector Extrema (VX), Greedy Matching (GM)
         # load the dict
-        # with open('./data/glove_embedding.pkl', 'rb') as f:
-        #     dic = pickle.load(f)
-#         dic = gensim.models.KeyedVectors.load_word2vec_format('./data/GoogleNews-vectors-negative300.bin', binary=True)
-#         print('[!] load the GoogleNews 300 word2vector by gensim over')
-#         ea_sum, vx_sum, gm_sum, counterp = 0, 0, 0, 0
-#         for rr, cc in tqdm(list(zip(ref, tgt))):
-#             ea_sum += cal_embedding_average(rr, cc, dic)
-#             vx_sum += cal_vector_extrema(rr, cc, dic)
-#             gm_sum += cal_greedy_matching_matrix(rr, cc, dic)
-#             counterp += 1
+        dic = gensim.models.KeyedVectors.load_word2vec_format('./data/GoogleNews-vectors-negative300.bin', binary=True)
+        print('[!] load the GoogleNews 300 word2vector by gensim over')
+        ea_sum, vx_sum, gm_sum, counterp = 0, 0, 0, 0
+        no_save = 0
+        for rr, cc in tqdm(list(zip(ref, tgt))):
+            ea_sum_ = cal_embedding_average(rr, cc, dic)
+            vx_sum_ = cal_vector_extrema(rr, cc, dic)
+            gm_sum += cal_greedy_matching_matrix(rr, cc, dic)
+            # gm_sum += cal_greedy_matching(rr, cc, dic)
+            if ea_sum_ != 1 and vx_sum_ != 1:
+                ea_sum += ea_sum_
+                vx_sum += vx_sum_
+                counterp += 1
+            else:
+                no_save += 1
 
-        # write into the tensorboard
-#         writer.add_scalar('{}-Performance/PPL'.format(title), ppl, epoch)
-#         writer.add_scalar('{}-Performance/BLEU-1'.format(title), bleu1_sum, epoch)
-#         writer.add_scalar('{}-Performance/BLEU-2'.format(title), bleu2_sum, epoch)
-#         writer.add_scalar('{}-Performance/BLEU-3'.format(title), bleu3_sum, epoch)
-#         writer.add_scalar('{}-Performance/BLEU-4'.format(title), bleu4_sum, epoch)
-#         writer.add_scalar('{}-Performance/ROUGE'.format(title), rouge_sum / counter, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Distinct-1', distinct_1, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Distinct-2', distinct_2, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-1', rdistinct_1, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Ref-Distinct-2', rdistinct_2, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Embedding-Average', ea_sum / counterp, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Vector-Extrema', vx_sum / counterp, epoch)
-#         writer.add_scalar(f'{writer_str}-Performance/Greedy-Matching', gm_sum / counterp, epoch)
+    #     print(f'[!] It should be noted that UNK ratio for embedding-based: {round(no_save / (no_save + counterp), 4)}')
+    #     print(f'Model {args.model} Result')
+        print(f'BLEU-1: {round(bleu1_sum, 4)}')
+        print(f'BLEU-2: {round(bleu2_sum, 4)}')
+        print(f'BLEU-3: {round(bleu3_sum, 4)}')
+        print(f'BLEU-4: {round(bleu4_sum, 4)}')
+        print(f'ROUGE: {round(rouge_sum / counter, 4)}')
+        print(f'Intra Distinct-1: {round(intra_distinct_1, 4)}; Intra Distinct-2: {round(intra_distinct_2, 4)}')
+        print(f'Intra Ref distinct-1: {round(rintra_distinct_1, 4)}; Intra Ref distinct-2: {round(rintra_distinct_2, 4)}')
+        print(f'Distinct-1: {round(distinct_1, 4)}; Distinct-2: {round(distinct_2, 4)}')
+        print(f'Ref distinct-1: {round(rdistinct_1, 4)}; Ref distinct-2: {round(rdistinct_2, 4)}')
+        print(f'EA: {round(ea_sum / counterp, 4)}')
+        print(f'VX: {round(vx_sum / counterp, 4)}')
+        print(f'GM: {round(gm_sum / counterp, 4)}')
+        print(f'BERTScore: {round(bert_scores, 4)}')
 
-        print("[Epoch: {:3d}][BLEU-1: {:6f}][BLEU-2: {:6f}][BLEU-3: {:6f}][BLEU-4: {:6f}][ROUGE: {:6f}][PPL: {:6f}]".format(
-                        epoch, bleu1_sum, bleu2_sum, bleu3_sum, bleu4_sum, rouge_sum / counter, ppl))
-
-        # write now
-        # writer.flush()
         
         
 
